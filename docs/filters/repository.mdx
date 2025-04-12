@@ -1,0 +1,338 @@
+---
+title: "Repository Filter"
+description: "Filter rules based on repository properties"
+---
+
+The Repository Filter allows you to apply rules based on repository properties such as name, visibility, and topics. This is useful when you have the same ruleset configuration across multiple repositories but want certain rules to apply only to specific repositories.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"repository"`
+</ParamField>
+
+<ParamField path="visibility" type="string">
+  Repository visibility to match ("public" or "private")
+</ParamField>
+
+<ParamField path="name" type="object">
+  Conditions for repository name
+</ParamField>
+
+<ParamField path="name.match" type="string | string[]">
+  Repository name patterns that should match
+</ParamField>
+
+<ParamField path="name.ignore" type="string | string[]">
+  Repository name patterns that should not match
+</ParamField>
+
+<ParamField path="topics" type="object">
+  Conditions for repository topics
+</ParamField>
+
+<ParamField path="topics.match" type="string | string[]">
+  Repository topic patterns that should match
+</ParamField>
+
+<ParamField path="topics.ignore" type="string | string[]">
+  Repository topic patterns that should not match
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "repository"
+    visibility: "public"
+```
+
+## Examples
+
+### Repository Visibility
+
+Apply a rule only to public repositories:
+
+```yaml
+if:
+  - type: "repository"
+    visibility: "public"
+```
+
+Or only to private repositories:
+
+```yaml
+if:
+  - type: "repository"
+    visibility: "private"
+```
+
+### Repository Name Matching
+
+Apply a rule only to repositories with specific names:
+
+```yaml
+if:
+  - type: "repository"
+    name:
+      match: ["api", "backend", "server"]
+```
+
+Or use patterns to match repository names:
+
+```yaml
+if:
+  - type: "repository"
+    name:
+      match: ".*-service"
+      ignore: "deprecated-.*"
+```
+
+### Repository Topics
+
+Apply a rule only to repositories with specific topics:
+
+```yaml
+if:
+  - type: "repository"
+    topics:
+      match: ["javascript", "react", "frontend"]
+```
+
+Or exclude repositories with certain topics:
+
+```yaml
+if:
+  - type: "repository"
+    topics:
+      ignore: ["archived", "deprecated"]
+```
+
+### Combined Criteria
+
+Combine multiple repository properties:
+
+```yaml
+if:
+  - type: "repository"
+    visibility: "public"
+    name:
+      match: "api-.*"
+    topics:
+      match: "production"
+      ignore: "experimental"
+```
+
+## Pattern Matching
+
+The Repository Filter supports several pattern matching methods:
+
+1. **Exact match**: `"api"`
+2. **Glob patterns**: `"api-*"`
+3. **Regular expressions**: `"/^api-v\\d+$/"` (enclosed in forward slashes)
+
+## How It Works
+
+<Steps>
+  <Step title="Get Repository Information">
+    The filter retrieves basic repository information from the event context
+  </Step>
+  <Step title="Check Visibility">
+    If `visibility` is specified, it checks if the repository visibility matches
+  </Step>
+  <Step title="Check Name Patterns">
+    If `name` conditions are specified, it checks if the repository name matches the requirements
+  </Step>
+  <Step title="Get Repository Topics">
+    If `topics` conditions are specified, it retrieves the repository topics
+  </Step>
+  <Step title="Check Topic Patterns">
+    It checks if the repository topics match the specified requirements
+  </Step>
+  <Step title="Determine Result">
+    Returns a match result based on whether all specified conditions are satisfied
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Different Rules by Repository Type
+
+Apply different rules based on repository purpose:
+
+```yaml
+ruleset:
+  - name: "API Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "repository"
+        topics:
+          match: "api"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/routes/(.+)\\.js$"
+            require: "docs/api/$1.md"
+    on_failure:
+      - comment:
+          body: "API changes require corresponding documentation updates"
+
+  - name: "Frontend Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "repository"
+        topics:
+          match: "frontend"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/components/(.+)\\.jsx$"
+            require: "src/components/$1.test.jsx"
+    on_failure:
+      - comment:
+          body: "Frontend components require test files"
+```
+
+### Public vs Private Repository Rules
+
+Apply stricter rules to public repositories:
+
+```yaml
+ruleset:
+  - name: "Public Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "repository"
+        visibility: "public"
+    validate:
+      - type: "description"
+        no_empty: true
+        length:
+          min: 100
+      - type: "title"
+        match: "^(feat|fix|docs|chore|refactor): .+"
+    on_failure:
+      - comment:
+          body: |
+            Public repositories have stricter requirements:
+            - Detailed PR descriptions (100+ characters)
+            - Conventional commit format for PR titles
+
+            Please update your PR to meet these requirements.
+
+  - name: "Private Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "repository"
+        visibility: "private"
+    validate:
+      - type: "description"
+        no_empty: true
+    on_failure:
+      - comment:
+          body: "Please add a description to your PR."
+```
+
+### Repository Name Patterns
+
+Apply rules based on repository name patterns:
+
+```yaml
+ruleset:
+  - name: "Service Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "repository"
+        name:
+          match: ".*-service"
+    validate:
+      - type: "label"
+        include: ["service-change"]
+    on_failure:
+      - label:
+          add: ["service-change"]
+      - comment:
+          body: "Added 'service-change' label for tracking purposes."
+
+  - name: "Library Repository Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "repository"
+        name:
+          match: ".*-lib"
+    validate:
+      - type: "label"
+        include: ["library-change"]
+    on_failure:
+      - label:
+          add: ["library-change"]
+      - comment:
+          body: "Added 'library-change' label for tracking purposes."
+```
+
+### Topic-Based Requirements
+
+Enforce specific requirements based on repository topics:
+
+```yaml
+ruleset:
+  - name: "Security Critical Repository"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "repository"
+        topics:
+          match: "security-critical"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+        include: ["security-team-lead"]
+    on_failure:
+      - comment:
+          body: |
+            This repository is marked as security-critical and requires:
+            - At least 2 approvals
+            - Explicit approval from the security team lead
+```
+
+## Best Practices
+
+<Check>Use consistent repository naming conventions</Check>
+<Check>Apply meaningful topics to all repositories</Check>
+<Check>Document topic usage in your organization</Check>
+<Check>Use repository visibility appropriately</Check>
+
+<Warning>
+  Repository topics must be set manually before they can be used in filters
+</Warning>
+
+## Managing Repository Topics
+
+To maximize the effectiveness of the Repository Filter with topics:
+
+1. **Define a Taxonomy**: Create a standard set of topics for your organization
+2. **Document Topics**: Document the meaning and usage of each topic
+3. **Apply Consistently**: Apply topics consistently across repositories
+4. **Review Regularly**: Periodically review and update repository topics
+
+To add topics to a repository:
+
+1. Go to the repository's main page
+2. Click "About" on the right side
+3. Click the gear icon next to the About section
+4. Add topics in the "Topics" field
+5. Click "Save changes"

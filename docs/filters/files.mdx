@@ -1,0 +1,300 @@
+---
+title: "Files Filter"
+description: "Filter rules based on modified files"
+---
+
+The Files Filter allows you to apply rules only when specific files are modified in a pull request. This is useful for creating targeted rules that apply only to certain parts of your codebase.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"files"`
+</ParamField>
+
+<ParamField path="added" type="object">
+  Conditions for added files
+</ParamField>
+
+<ParamField path="added.match" type="string | string[]">
+  File patterns that should match for added files
+</ParamField>
+
+<ParamField path="added.ignore" type="string | string[]">
+  File patterns that should not match for added files
+</ParamField>
+
+<ParamField path="modified" type="object">
+  Conditions for modified files
+</ParamField>
+
+<ParamField path="modified.match" type="string | string[]">
+  File patterns that should match for modified files
+</ParamField>
+
+<ParamField path="modified.ignore" type="string | string[]">
+  File patterns that should not match for modified files
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: "src/frontend/.*"
+```
+
+## Examples
+
+### Match Specific Files
+
+Apply a rule
+Apply a rule only when specific files are modified:
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: "package.json"
+```
+
+### Match File Types
+
+Apply a rule based on file types:
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: ".*\\.(js|ts|tsx)$"
+```
+
+### Match Files in Directory
+
+Apply a rule only when files in a specific directory are changed:
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: "src/components/.*"
+```
+
+### Ignore Certain Files
+
+Apply a rule only when meaningful files are changed (ignoring configuration files):
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: "src/.*"
+      ignore: [".*\\.config.js", "package-lock.json"]
+```
+
+### Added Files Only
+
+Apply a rule only when new files are added:
+
+```yaml
+if:
+  - type: "files"
+    added:
+      match: "src/.*"
+```
+
+## Pattern Matching
+
+The Files Filter supports several pattern matching methods:
+
+1. **Exact match**: `"package.json"`
+2. **Glob patterns**: `"src/**/*.js"`
+3. **Regular expressions**: `"/^src\/.*\.jsx?$/"` (enclosed in forward slashes)
+
+## How It Works
+
+<Steps>
+  <Step title="Get Changed Files">
+    The filter retrieves all files changed in the PR, categorized by change type (added, modified, deleted)
+  </Step>
+  <Step title="Process Added Files">
+    If `added` conditions are specified, it checks if added files match the required patterns
+  </Step>
+  <Step title="Process Modified Files">
+    If `modified` conditions are specified, it checks if modified files match the required patterns
+  </Step>
+  <Step title="Determine Match">
+    Returns a match result indicating whether the specified file patterns were found
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Component-Specific Rules
+
+Apply different rules based on the type of components changed:
+
+```yaml
+ruleset:
+  - name: "Frontend Tests Required"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/components/.*\\.(js|tsx)$"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/components/(.+)\\.(js|tsx)$"
+            require: "src/components/$1.test.(js|tsx)"
+    on_failure:
+      - comment:
+          body: "Frontend component changes require corresponding test files"
+
+  - name: "API Documentation"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/api/.*"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/api/(.+)\\.js$"
+            require: "docs/api/$1.md"
+    on_failure:
+      - comment:
+          body: "API changes require updated documentation"
+```
+
+### Security Review for Sensitive Files
+
+Require special handling for security-sensitive changes:
+
+```yaml
+ruleset:
+  - name: "Security Review"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["src/auth/.*", "src/crypto/.*", "config/security\\..*"]
+    on_success:
+      - label:
+          add: ["security-review-required"]
+      - requestReview:
+          reviewers: ["security-team-lead"]
+      - comment:
+          body: |
+            This PR modifies security-sensitive files and requires a security review.
+
+            @security-team-lead has been automatically requested as a reviewer.
+```
+
+### Different Requirements by File Type
+
+Apply different validation rules based on file type:
+
+```yaml
+ruleset:
+  - name: "JavaScript Style"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ".*\\.js$"
+    validate:
+      - type: "dependent"
+        files:
+          - when: ".*\\.js$"
+            require: ".eslintrc.js"
+
+  - name: "CSS Style"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ".*\\.css$"
+    validate:
+      - type: "dependent"
+        files:
+          - when: ".*\\.css$"
+            require: ".stylelintrc"
+```
+
+### Automatic Labeling
+
+Automatically label PRs based on changed files:
+
+```yaml
+ruleset:
+  - name: "Frontend Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/frontend/.*"
+    on_success:
+      - label:
+          add: ["frontend"]
+
+  - name: "Backend Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/backend/.*"
+    on_success:
+      - label:
+          add: ["backend"]
+
+  - name: "Documentation Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["docs/.*", "README\\.md"]
+    on_success:
+      - label:
+          add: ["documentation"]
+```
+
+## Best Practices
+
+<Check>Use specific patterns to target exactly the files you care about</Check>
+<Check>Group related file patterns for clarity</Check>
+<Check>Consider using the ignore patterns to exclude non-substantive changes</Check>
+<Check>Test your patterns to ensure they match as expected</Check>
+
+<Warning>
+  Overly complex patterns can be difficult to maintain; keep them as simple as possible
+</Warning>
+
+## Pattern Examples
+
+Here are some common pattern examples:
+
+| Pattern                 | Matches                                           |
+| ----------------------- | ------------------------------------------------- |
+| `src/.*`                | All files in the src directory and subdirectories |
+| `.*\\.js$`              | All JavaScript files                              |
+| `.*\\.(js\|ts)$`        | All JavaScript and TypeScript files               |
+| `src/components/.*`     | All files in src/components and subdirectories    |
+| `package\\.json`        | Only the root package.json file                   |
+| `/^docs\/api\/.*\.md$/` | Markdown files in the docs/api directory          |

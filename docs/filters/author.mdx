@@ -1,0 +1,119 @@
+---
+title: 'Author Filter'
+description: 'Filter rules based on PR author'
+---
+
+The Author Filter allows you to apply rules only to PRs created by specific users. This is useful for creating different validation rules for different contributors, such as having stricter rules for external contributors or bypassing certain checks for bots.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"author"`
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Username patterns that should match (supports regex)
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Username patterns that should not match (supports regex)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "author"
+    match: "username1"  # Apply rule only to PRs created by username1
+```
+
+## Examples
+
+### Match Specific Users
+
+Apply a rule only to PRs from specific users:
+
+```yaml
+if:
+  - type: "author"
+    match: ["username1", "username2"]
+```
+
+### Exclude Bots
+
+Skip a rule for PRs created by bots:
+
+```yaml
+if:
+  - type: "author"
+    ignore: ["dependabot", "renovate", ".*\\[bot\\]"]
+```
+
+### Team Members
+
+Apply a rule only to PRs from team members (usernames starting with "team-"):
+
+```yaml
+if:
+  - type: "author"
+    match: "team-.*"
+```
+
+## Pattern Matching
+
+The Author Filter supports several pattern matching methods:
+
+1. **Exact match**: `"username1"`
+2. **Glob patterns**: `"team-*"` 
+3. **Regular expressions**: `"/^team-.*$/"` (enclosed in forward slashes)
+
+## Practical Example
+
+Different validation rules for team members vs. external contributors:
+
+```yaml
+ruleset:
+  # Rule for team members
+  - name: "Team Member PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        match: "team-.*"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+    on_failure:
+      - comment:
+          body: "Please follow our title convention"
+
+  # Rule for external contributors
+  - name: "External Contributor PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        ignore: "team-.*"
+    validate:
+      - type: "description"
+        no_empty: true
+        length:
+          min: 100
+    on_failure:
+      - comment:
+          body: "Thank you for your contribution! Please provide a detailed description of your changes."
+```
+
+## How It Works
+
+The Author Filter retrieves the username of the PR author from the GitHub event context and checks if it matches the specified patterns. If `match` is specified, the author must match at least one of the patterns for the rule to be applied. If `ignore` is specified, the author must not match any of the patterns.
+
+## Best Practices
+
+<Check>Use clear and specific patterns</Check>
+<Check>Consider using this filter to create different experiences for different contributor types</Check>
+<Check>Remember that usernames are case-sensitive in GitHub</Check>
+
+<Warning>
+  Be careful not to inadvertently exclude legitimate contributors through overly restrictive patterns
+</Warning>

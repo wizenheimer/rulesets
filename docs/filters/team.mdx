@@ -1,0 +1,293 @@
+---
+title: "Team Filter"
+description: "Filter rules based on team membership"
+---
+
+The Team Filter allows you to apply rules based on whether the pull request author belongs to specific GitHub teams. This helps create different validation rules for different teams or ensure that only team members can perform certain actions.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"team"`
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Team patterns that the author should belong to (format: "org/team-slug")
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Team patterns that the author should not belong to (format: "org/team-slug")
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "team"
+    match: "myorg/frontend-team"
+```
+
+## Examples
+
+### Match Specific Team
+
+Apply a rule only to PRs authored by members of a specific team:
+
+```yaml
+if:
+  - type: "team"
+    match: "myorg/frontend-team"
+```
+
+### Match Multiple Teams
+
+Apply a rule to PRs authored by members of any of several teams:
+
+```yaml
+if:
+  - type: "team"
+    match: ["myorg/frontend-team", "myorg/design-team"]
+```
+
+### Exclude Team Members
+
+Apply a rule only to PRs not authored by members of specific teams:
+
+```yaml
+if:
+  - type: "team"
+    ignore: ["myorg/admin-team", "myorg/security-team"]
+```
+
+### Combined Team Requirements
+
+Apply complex team membership conditions:
+
+```yaml
+if:
+  - type: "team"
+    match: "myorg/developers"
+    ignore: ["myorg/interns", "myorg/contractors"]
+```
+
+## Team Format
+
+<Warning>Team names must be in the format `organization/team-slug`</Warning>
+
+For example:
+
+- `mycompany/frontend-team`
+- `mycompany/backend-team`
+- `myorg/admins`
+
+## How It Works
+
+<Steps>
+  <Step title="Get PR Author">
+    The filter retrieves the username of the PR author
+  </Step>
+  <Step title="Check Team Membership">
+    For each specified team, it checks if the author is a member of that team
+  </Step>
+  <Step title="Apply Match Conditions">
+    If `match` is specified, it checks if the author belongs to at least one of
+    the matched teams
+  </Step>
+  <Step title="Apply Ignore Conditions">
+    If `ignore` is specified, it checks if the author doesn't belong to any of
+    the ignored teams
+  </Step>
+  <Step title="Determine Result">
+    Returns a match result based on the team membership checks
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Team-Specific Validations
+
+Apply different validation rules for different teams:
+
+```yaml
+ruleset:
+  - name: "Frontend Team Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "team"
+        match: "myorg/frontend-team"
+      - type: "files"
+        modified:
+          match: "src/frontend/.*"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/frontend/components/(.+)\\.jsx$"
+            require: "src/frontend/components/$1.test.jsx"
+    on_failure:
+      - comment:
+          body: "Frontend components require test files"
+
+  - name: "Backend Team Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "team"
+        match: "myorg/backend-team"
+      - type: "files"
+        modified:
+          match: "src/backend/.*"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/backend/api/(.+)\\.js$"
+            require: "test/backend/api/$1.test.js"
+    on_failure:
+      - comment:
+          body: "Backend API endpoints require test files"
+```
+
+### Different Requirements by Experience Level
+
+Apply different rules based on team experience levels:
+
+```yaml
+ruleset:
+  - name: "Senior Developer Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.ready_for_review"
+    if:
+      - type: "team"
+        match: "myorg/senior-developers"
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_success:
+      - label:
+          add: ["ready-to-merge"]
+
+  - name: "Junior Developer Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.ready_for_review"
+    if:
+      - type: "team"
+        match: "myorg/junior-developers"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+        include: ["senior-reviewer"]
+    on_success:
+      - label:
+          add: ["ready-to-merge"]
+    on_failure:
+      - comment:
+          body: "PRs from junior developers require at least 2 approvals, including from a senior reviewer"
+```
+
+### Restricted Operations
+
+Restrict certain operations to specific teams:
+
+```yaml
+ruleset:
+  - name: "Security File Changes"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["config/security/.*", "src/auth/.*"]
+      - type: "team"
+        ignore: "myorg/security-team"
+    validate:
+      - type: "approvals"
+        count:
+          min: 3
+        include: ["security-lead", "cto"]
+    on_failure:
+      - label:
+          add: ["security-review-required"]
+      - comment:
+          body: |
+            Changes to security-sensitive files from non-security team members
+            require additional scrutiny:
+
+            - At least 3 approvals
+            - Explicit approval from the security lead and CTO
+```
+
+### Team Labeling
+
+Automatically label PRs based on the author's team:
+
+```yaml
+ruleset:
+  - name: "Frontend Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/frontend-team"
+    on_success:
+      - label:
+          add: ["team: frontend"]
+
+  - name: "Backend Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/backend-team"
+    on_success:
+      - label:
+          add: ["team: backend"]
+
+  - name: "DevOps Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/devops-team"
+    on_success:
+      - label:
+          add: ["team: devops"]
+```
+
+## Best Practices
+
+<Check>Organize repository access through GitHub teams</Check>
+<Check>Create teams that reflect organizational structure</Check>
+<Check>Use descriptive team names</Check>
+<Check>Apply least privilege principles to team permissions</Check>
+
+<Warning>
+  The GitHub App needs appropriate permissions to check team membership
+</Warning>
+
+## Required Permissions
+
+For the Team Filter to work:
+
+1. The GitHub App must have the `members:read` permission
+2. The teams must be visible to the GitHub App
+3. Teams must be properly set up in the GitHub organization
+
+## Setting Up Teams in GitHub
+
+To create and manage teams:
+
+1. Go to your organization's page
+2. Click on "Teams" in the top navigation
+3. Click the "New team" button
+4. Provide a team name and description
+5. Add members to the team
+6. Grant repository access as needed
+
+Teams can be nested to reflect your organizational hierarchy, which helps with permission management.

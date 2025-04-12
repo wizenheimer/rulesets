@@ -1,0 +1,157 @@
+---
+title: 'Branch Filter'
+description: 'Filter rules based on branch names'
+---
+
+The Branch Filter allows you to apply rules only to PRs involving specific branches. This is useful for creating different validation rules for different types of branches, such as having stricter rules for PRs targeting production branches.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"branch"`
+</ParamField>
+
+<ParamField path="base" type="object">
+  Conditions for the base branch (the branch you're merging into)
+</ParamField>
+
+<ParamField path="base.match" type="string | string[]">
+  Base branch patterns that should match (supports regex)
+</ParamField>
+
+<ParamField path="base.ignore" type="string | string[]">
+  Base branch patterns that should not match (supports regex)
+</ParamField>
+
+<ParamField path="head" type="object">
+  Conditions for the head branch (the branch with your changes)
+</ParamField>
+
+<ParamField path="head.match" type="string | string[]">
+  Head branch patterns that should match (supports regex)
+</ParamField>
+
+<ParamField path="head.ignore" type="string | string[]">
+  Head branch patterns that should not match (supports regex)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "branch"
+    base:
+      match: "main"  # Apply rule only to PRs targeting main branch
+```
+
+## Examples
+
+### Production Branches
+
+Apply a rule only to PRs targeting production branches:
+
+```yaml
+if:
+  - type: "branch"
+    base:
+      match: ["main", "production", "release-.*"]
+```
+
+### Feature Branches
+
+Apply a rule only to PRs from feature branches:
+
+```yaml
+if:
+  - type: "branch"
+    head:
+      match: "feature/.*"
+```
+
+### Exclude WIP Branches
+
+Skip a rule for PRs from work-in-progress branches:
+
+```yaml
+if:
+  - type: "branch"
+    head:
+      ignore: ["wip/.*", "draft/.*"]
+```
+
+### Specific Branch Combinations
+
+Apply a rule only to PRs from feature branches to the main branch:
+
+```yaml
+if:
+  - type: "branch"
+    base:
+      match: "main"
+    head:
+      match: "feature/.*"
+```
+
+## Pattern Matching
+
+The Branch Filter supports several pattern matching methods:
+
+1. **Exact match**: `"main"`
+2. **Glob patterns**: `"release-*"` 
+3. **Regular expressions**: `"/^feature\/.*$/"` (enclosed in forward slashes)
+
+## Practical Example
+
+Different validation rules for different branch types:
+
+```yaml
+ruleset:
+  # Strict rules for production PRs
+  - name: "Production PR"
+    when:
+      - "pull_request.*"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+        require_code_owners: true
+      - type: "size"
+        files: 20
+    on_failure:
+      - comment:
+          body: "PRs to main require at least 2 approvals including code owners and should be limited in size."
+
+  # Looser rules for development PRs
+  - name: "Development PR"
+    when:
+      - "pull_request.*"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_failure:
+      - comment:
+          body: "PRs to develop require at least 1 approval."
+```
+
+## How It Works
+
+The Branch Filter retrieves the base and head branch names from the GitHub event context and checks if they match the specified patterns. If `match` is specified, the branch must match at least one of the patterns for the rule to be applied. If `ignore` is specified, the branch must not match any of the patterns.
+
+## Best Practices
+
+<Check>Use branch naming conventions consistently in your team</Check>
+<Check>Create branch-specific rules that align with your development workflow</Check>
+<Check>Consider branch protection rules alongside Rulesets</Check>
+
+<Warning>
+  Be aware that branch names are case-sensitive in Git/GitHub
+</Warning>

@@ -1,0 +1,292 @@
+---
+title: "Milestone Filter"
+description: "Filter rules based on PR milestone"
+---
+
+The Milestone Filter allows you to apply rules only to pull requests that have (or don't have) specific milestones. This helps target rules based on release planning or project phases.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"milestone"`
+</ParamField>
+
+<ParamField path="required" type="boolean">
+  Whether a milestone is required for the rule to apply
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Milestone title pattern(s) that should match (supports regex)
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Milestone title pattern(s) that should not match (supports regex)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "milestone"
+    match: "v2.0.0"
+```
+
+## Examples
+
+### Match Specific Milestone
+
+Apply a rule only to PRs with a specific milestone:
+
+```yaml
+if:
+  - type: "milestone"
+    match: "v2.0.0"
+```
+
+### Match Multiple Milestones
+
+Apply a rule to PRs with any of several milestones:
+
+```yaml
+if:
+  - type: "milestone"
+    match: ["v2.0.0", "v2.1.0", "v2.2.0"]
+```
+
+### Pattern Matching
+
+Apply a rule to PRs with milestones matching a pattern:
+
+```yaml
+if:
+  - type: "milestone"
+    match: "v2\\..*"
+```
+
+### Require Any Milestone
+
+Apply a rule only to PRs that have any milestone set:
+
+```yaml
+if:
+  - type: "milestone"
+    required: true
+```
+
+### Exclude Milestones
+
+Apply a rule only to PRs that don't have specific milestones:
+
+```yaml
+if:
+  - type: "milestone"
+    ignore: ["Future", "Backlog"]
+```
+
+## Pattern Matching
+
+The Milestone Filter supports several pattern matching methods:
+
+1. **Exact match**: `"v2.0.0"`
+2. **Glob patterns**: `"v2.*"`
+3. **Regular expressions**: `"/^v2\\.\\d+\\.\\d+$/"` (enclosed in forward slashes)
+
+## How It Works
+
+<Steps>
+  <Step title="Get Milestone">
+    The filter retrieves the milestone associated with the PR, if any
+  </Step>
+  <Step title="Check Required">
+    If `required` is true, it checks that a milestone is set
+  </Step>
+  <Step title="Check Match Patterns">
+    If `match` is specified, it checks if the milestone title matches any of the patterns
+  </Step>
+  <Step title="Check Ignore Patterns">
+    If `ignore` is specified, it checks if the milestone title matches any of the ignore patterns
+  </Step>
+  <Step title="Determine Result">
+    Returns a match result based on whether the milestone satisfies all conditions
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Release-Specific Rules
+
+Apply different rules based on release milestones:
+
+```yaml
+ruleset:
+  - name: "Major Release Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.milestoned"
+    if:
+      - type: "milestone"
+        match: "v[0-9]+\\.0\\.0" # Major version releases
+    validate:
+      - type: "approvals"
+        count:
+          min: 3
+        include: ["product-manager", "cto"]
+    on_failure:
+      - comment:
+          body: |
+            PRs for major releases (v*.0.0) require at least 3 approvals, including from the product manager and CTO.
+
+            Please ensure you get the necessary approvals before merging.
+
+  - name: "Minor Release Rules"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.milestoned"
+    if:
+      - type: "milestone"
+        match: "v[0-9]+\\.[1-9][0-9]*\\.0" # Minor version releases
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+        include: ["tech-lead"]
+    on_failure:
+      - comment:
+          body: "PRs for minor releases require at least 2 approvals, including from a tech lead."
+```
+
+### Milestone Requirement
+
+Enforce that PRs have a milestone:
+
+```yaml
+ruleset:
+  - name: "Milestone Required"
+    when:
+      - "pull_request.opened"
+      - "pull_request.ready_for_review"
+    validate:
+      - type: "milestone"
+        required: true
+        message: "PRs must have a milestone assigned"
+    on_failure:
+      - label:
+          add: ["needs-milestone"]
+      - comment:
+          body: |
+            This PR does not have a milestone assigned.
+
+            Please add a milestone to indicate when this change is expected to be released.
+```
+
+### Different Tests by Release Type
+
+Run different test requirements based on milestone:
+
+```yaml
+ruleset:
+  - name: "Stable Release Tests"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "pull_request.milestoned"
+    if:
+      - type: "milestone"
+        match: "v[0-9]+\\.[0-9]+\\.0" # Stable releases (x.y.0)
+    validate:
+      - type: "label"
+        include: ["tested:e2e", "tested:integration", "tested:unit"]
+    on_failure:
+      - comment:
+          body: |
+            PRs for stable releases must have all three test labels:
+            - tested:e2e
+            - tested:integration
+            - tested:unit
+
+  - name: "Patch Release Tests"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "pull_request.milestoned"
+    if:
+      - type: "milestone"
+        match: "v[0-9]+\\.[0-9]+\\.[1-9]" # Patch releases (x.y.z where z > 0)
+    validate:
+      - type: "label"
+        include: ["tested:unit"]
+    on_failure:
+      - comment:
+          body: "PRs for patch releases must have the tested:unit label."
+```
+
+### Auto-Labeling by Milestone
+
+Automatically add labels based on milestones:
+
+```yaml
+ruleset:
+  - name: "Milestone Labels"
+    when:
+      - "pull_request.opened"
+      - "pull_request.milestoned"
+      - "pull_request.demilestoned"
+    if:
+      - type: "milestone"
+        match: "v3\\.0\\.0"
+    on_success:
+      - label:
+          add: ["next-major-release"]
+          remove: ["current-release", "future-release"]
+
+  - name: "Current Release Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.milestoned"
+      - "pull_request.demilestoned"
+    if:
+      - type: "milestone"
+        match: "v2\\.[0-9]+\\.[0-9]+"
+    on_success:
+      - label:
+          add: ["current-release"]
+          remove: ["next-major-release", "future-release"]
+
+  - name: "Future Release Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.milestoned"
+      - "pull_request.demilestoned"
+    if:
+      - type: "milestone"
+        match: "v[4-9]\\.[0-9]+\\.[0-9]+"
+    on_success:
+      - label:
+          add: ["future-release"]
+          remove: ["current-release", "next-major-release"]
+```
+
+## Best Practices
+
+<Check>Use clear, consistent milestone naming conventions</Check>
+<Check>Create milestones for all planned releases</Check>
+<Check>Document your milestone requirements in contributing guidelines</Check>
+<Check>Consider using semantic versioning patterns in milestone names</Check>
+
+<Warning>
+  Remember that milestones need to be created manually before they can be assigned to PRs
+</Warning>
+
+## Integration with Release Process
+
+The Milestone Filter works best as part of a comprehensive release process:
+
+1. **Create Milestones**: Create milestones for upcoming releases in GitHub
+2. **Assign PRs**: Require all PRs to be assigned to a milestone
+3. **Filter Rules**: Use the Milestone Filter to apply different requirements based on the target release
+4. **Tracking**: Use GitHub's milestone view to track progress toward releases
+5. **Release Notes**: Generate release notes based on PRs in each milestone
+
+This approach helps maintain a clear connection between changes and releases.

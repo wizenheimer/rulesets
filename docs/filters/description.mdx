@@ -1,0 +1,264 @@
+---
+title: "Description Filter"
+description: "Filter rules based on PR description content"
+---
+
+The Description Filter allows you to apply rules only when a pull request's description contains (or doesn't contain) specific content. This helps target rules based on the context or purpose described in the PR.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"description"`
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Pattern(s) that the description should match (supports regex)
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Pattern(s) that the description should not match (supports regex)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+if:
+  - type: "description"
+    match: "breaking change"
+```
+
+## Examples
+
+### Match Specific Text
+
+Apply a rule only when the description contains specific text:
+
+```yaml
+if:
+  - type: "description"
+    match: "breaking change"
+```
+
+### Match Multiple Patterns
+
+Apply a rule when the description matches any of several patterns:
+
+```yaml
+if:
+  - type: "description"
+    match: ["fixes #\\d+", "resolves #\\d+", "closes #\\d+"]
+```
+
+### Exclude Patterns
+
+Apply a rule only when the description doesn't mention something:
+
+```yaml
+if:
+  - type: "description"
+    ignore: "WIP"
+```
+
+### Combined Matching
+
+Apply a rule with both inclusion and exclusion patterns:
+
+```yaml
+if:
+  - type: "description"
+    match: "migration"
+    ignore: ["revert", "rollback"]
+```
+
+## Pattern Matching
+
+The Description Filter supports several pattern matching methods:
+
+1. **Simple substring**: `"breaking change"`
+2. **Regular expressions**: `"/fixes #\\d+/i"` (enclosed in forward slashes)
+
+For case-insensitive matching with regex, use the `i` flag: `"/breaking change/i"`
+
+## How It Works
+
+<Steps>
+  <Step title="Get Description">
+    The filter retrieves the PR description from the GitHub event context
+  </Step>
+  <Step title="Check Match Patterns">
+    If `match` is specified, it checks if the description matches any of the patterns
+  </Step>
+  <Step title="Check Ignore Patterns">
+    If `ignore` is specified, it checks if the description matches any of the ignore patterns
+  </Step>
+  <Step title="Determine Result">
+    Returns a match result based on whether the description satisfies all conditions
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Breaking Changes Workflow
+
+Apply special rules to breaking changes:
+
+```yaml
+ruleset:
+  - name: "Breaking Change Review"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "BREAKING CHANGE"
+    on_success:
+      - label:
+          add: ["breaking-change"]
+      - requestReview:
+          reviewers: ["api-team-lead", "product-manager"]
+      - comment:
+          body: |
+            ## Breaking Change Detected
+
+            This PR includes a breaking change and requires additional reviews.
+
+            Please ensure this change:
+            - Is absolutely necessary
+            - Is properly documented
+            - Has a migration path for existing users
+```
+
+### Issue References
+
+Apply different rules based on whether a PR references an issue:
+
+```yaml
+ruleset:
+  - name: "Issue Reference Required"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        ignore: ["fixes #\\d+", "closes #\\d+", "resolves #\\d+"]
+    validate:
+      - type: "description"
+        match: "Issue: #\\d+"
+    on_failure:
+      - comment:
+          body: |
+            This PR doesn't appear to reference an issue.
+
+            Please add a line like `Fixes #123` or `Issue: #123` to your description.
+```
+
+### Release Notes Draft
+
+Apply specific rules to PRs with draft release notes:
+
+```yaml
+ruleset:
+  - name: "Release Notes Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "## Release Notes"
+    validate:
+      - type: "description"
+        length:
+          min: 200
+    on_failure:
+      - comment:
+          body: |
+            Your PR includes a Release Notes section, but it appears too brief.
+
+            Please provide more detailed release notes for user-facing changes.
+```
+
+### Work In Progress
+
+Skip certain validations for work-in-progress PRs:
+
+```yaml
+ruleset:
+  - name: "WIP PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "\\[WIP\\]|Work In Progress"
+    on_success:
+      - label:
+          add: ["wip"]
+      - comment:
+          body: |
+            This PR has been marked as a work in progress.
+
+            Some validations will be skipped, but please mark it as ready for review when completed.
+
+  - name: "Standard PR Validation"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        ignore: "\\[WIP\\]|Work In Progress"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+      - type: "description"
+        no_empty: true
+```
+
+## Best Practices
+
+<Check>Keep pattern matching simple and focused</Check>
+<Check>Provide clear explanations for pattern requirements</Check>
+<Check>Consider case sensitivity in your patterns</Check>
+<Check>Use PR templates to encourage consistent descriptions</Check>
+
+<Warning>
+  Regex patterns can become complex; test them thoroughly to ensure they match as expected
+</Warning>
+
+## Integration with PR Templates
+
+To make the most of the Description Filter, create a PR template with standard sections:
+
+```markdown
+<!-- .github/PULL_REQUEST_TEMPLATE.md -->
+
+## Description
+
+<!-- Describe your changes in detail -->
+
+## Related Issues
+
+<!-- Link to related issues using the format: Fixes #123 -->
+
+## Type of Change
+
+<!-- Mark with an `x` all the checkboxes that apply -->
+
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+
+<!-- Describe the testing you've done -->
+
+## Checklist
+
+<!-- Mark with an `x` all the checkboxes that apply -->
+
+- [ ] I have updated the documentation accordingly
+- [ ] I have added tests to cover my changes
+- [ ] All new and existing tests passed
+```
+
+This template creates predictable sections that your Description Filter can target.
