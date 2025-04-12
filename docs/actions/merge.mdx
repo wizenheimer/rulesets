@@ -1,0 +1,226 @@
+---
+title: 'Merge Action'
+description: 'Automatically merge pull requests'
+---
+
+The Merge Action allows you to automatically merge pull requests when they pass all validations. This is useful for automating routine merges, reducing manual work, and maintaining a consistent workflow.
+
+## Configuration
+
+<ParamField path="method" type="string" default="merge">
+  Merge method to use: "merge", "squash", or "rebase"
+</ParamField>
+
+<ParamField path="commit_title" type="string">
+  Custom title for the merge commit (supports templates)
+</ParamField>
+
+<ParamField path="commit_message" type="string">
+  Custom message for the merge commit (supports templates)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_success:
+  - merge:
+      method: "squash"
+```
+
+## Examples
+
+### Simple Auto-Merge
+
+Automatically merge PRs that pass all validations:
+
+```yaml
+on_success:
+  - merge:
+      method: "merge"
+```
+
+### Custom Commit Messages
+
+Specify custom titles and messages for merge commits:
+
+```yaml
+on_success:
+  - merge:
+      method: "squash"
+      commit_title: "{{ pull_request.title }} (#{{ pull_request.number }})"
+      commit_message: |
+        {{ pull_request.body }}
+        
+        Merged by Rulesets automation.
+```
+
+### Conditional Auto-Merge
+
+Merge documentation PRs automatically after review:
+
+```yaml
+ruleset:
+  - name: "Auto-merge Documentation Updates"
+    when:
+      - "pull_request_review.submitted"
+    if:
+      - type: "files"
+        modified:
+          match: "^(docs/|README.md|*.md)$"
+      - type: "label"
+        match: "documentation"
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_success:
+      - merge:
+          method: "squash"
+          commit_title: "docs: {{ pull_request.title }}"
+```
+
+## Merge Methods
+
+<Tabs>
+  <Tab title="Merge">
+    Creates a merge commit that preserves all commit history from the PR branch.
+    ```yaml
+    merge:
+      method: "merge"
+    ```
+    Best for: Preserving detailed history and context of changes.
+  </Tab>
+  <Tab title="Squash">
+    Combines all PR commits into a single commit on the base branch.
+    ```yaml
+    merge:
+      method: "squash"
+    ```
+    Best for: Keeping a clean, linear history on the main branch.
+  </Tab>
+  <Tab title="Rebase">
+    Applies each commit from the PR branch individually onto the base branch.
+    ```yaml
+    merge:
+      method: "rebase"
+    ```
+    Best for: Maintaining a linear history while preserving individual commits.
+  </Tab>
+</Tabs>
+
+## How It Works
+
+<Steps>
+  <Step title="Check Mergeability">
+    The action first checks if the PR is mergeable
+  </Step>
+  <Step title="Process Templates">
+    If custom commit titles or messages are provided, it processes the templates
+  </Step>
+  <Step title="Perform Merge">
+    The action merges the PR using the specified method
+  </Step>
+</Steps>
+
+## Error Handling
+
+The Merge Action will fail under these conditions:
+- PR has merge conflicts
+- PR doesn't meet branch protection requirements
+- Required status checks are failing
+- User lacks permission to merge
+
+When merge fails, the error will be logged but won't affect other actions.
+
+## Use Cases
+
+### Auto-Merge Dependency Updates
+
+Automatically merge dependency updates that pass tests:
+
+```yaml
+ruleset:
+  - name: "Auto-merge Dependencies"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "check_suite.completed"
+    if:
+      - type: "author"
+        match: ["dependabot", "renovate"]
+      - type: "check_suite"
+        status: "success"
+    validate:
+      - type: "size"
+        files: 5
+        ignore: ["package-lock.json", "yarn.lock"]
+    on_success:
+      - merge:
+          method: "squash"
+          commit_title: "chore(deps): {{ pull_request.title }}"
+```
+
+### Auto-Merge Typo Fixes
+
+Automatically merge simple typo fixes after approval:
+
+```yaml
+ruleset:
+  - name: "Auto-merge Typo Fixes"
+    when:
+      - "pull_request_review.submitted"
+    if:
+      - type: "title"
+        match: "^fix\\(typo\\): .*"
+      - type: "size"
+        total: 50
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_success:
+      - merge:
+          method: "squash"
+```
+
+### Auto-Merge for Specific Labels
+
+Merge PRs with specific labels after CI success:
+
+```yaml
+ruleset:
+  - name: "Auto-merge Labeled PRs"
+    when:
+      - "check_suite.completed"
+      - "pull_request.labeled"
+    if:
+      - type: "label"
+        match: "auto-merge"
+      - type: "check_suite"
+        status: "success"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+    on_success:
+      - merge:
+          method: "merge"
+```
+
+## Best Practices
+
+<Check>Use with appropriate validation checks to ensure quality</Check>
+<Check>Consider branch protection rules when setting up auto-merge</Check>
+<Check>Choose the merge method that best fits your workflow</Check>
+<Check>Use custom commit messages to maintain a meaningful history</Check>
+
+<Warning>
+  Be cautious with auto-merge on critical branches - always include sufficient validation
+</Warning>
+
+## Security Considerations
+
+- Only enable auto-merge for trusted contributors or with strict validation
+- Ensure all required checks (tests, approvals) are passing before merge
+- Consider limiting auto-merge to non-critical repositories or branches
+- Maintain audit logs of auto-merged PRs

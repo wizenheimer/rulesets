@@ -1,0 +1,204 @@
+---
+title: "Close Action"
+description: "Automatically close pull requests"
+---
+
+The Close Action allows you to automatically close pull requests based on validation results. This is useful for enforcing strict policies, handling abandoned PRs, or automating the rejection of PRs that don't meet specific criteria.
+
+## Configuration
+
+<ParamField path="reason" type="string">
+  Message explaining why the PR was closed (supports templates)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_failure:
+  - close:
+      reason: "This PR is being closed because it doesn't meet our requirements."
+```
+
+## Examples
+
+### Simple Close
+
+Close a PR without detailed explanation:
+
+```yaml
+on_failure:
+  - close: {}
+```
+
+### Close with Explanation
+
+Close a PR with a detailed explanation:
+
+```yaml
+on_failure:
+  - close:
+      reason: |
+        This PR is being closed because it doesn't meet our requirements.
+        Please review our contribution guidelines before submitting a new PR.
+```
+
+### Close with Template Variables
+
+Use template variables to provide context-specific explanations:
+
+```yaml
+on_failure:
+  - close:
+      reason: |
+        Hello @{{ pull_request.user.login }},
+
+        This PR is being closed because it failed the following validations:
+
+        {{ validation_summary }}
+
+        Please create a new PR that addresses these issues.
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Process Template">
+    If a `reason` is provided, the action processes the template, replacing variables with actual values
+  </Step>
+  <Step title="Add Comment">
+    If a `reason` is provided, it adds a comment with the explanation
+  </Step>
+  <Step title="Close PR">
+    It changes the PR state to "closed"
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Enforce PR Policies
+
+Close PRs that violate important policies:
+
+```yaml
+ruleset:
+  - name: "Force Fork for External Contributors"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        ignore: ["team-member-1", "team-member-2", "dependabot"]
+      - type: "branch"
+        head:
+          match: "^(main|master)$"
+    on_success:
+      - close:
+          reason: |
+            Hello @{{ pull_request.user.login }},
+
+            Thank you for your interest in contributing! However, we don't accept PRs from external contributors that modify the main branch directly.
+
+            Please create a fork of this repository and submit your PR from a branch in your fork.
+
+            For more information, see our [Contributing Guidelines](CONTRIBUTING.md).
+```
+
+### Automated PR Cleanup
+
+Automatically close stale or abandoned PRs:
+
+```yaml
+ruleset:
+  - name: "Close Abandoned PRs"
+    when:
+      - "schedule.weekly" # This would require additional configuration
+    validate:
+      - type: "age"
+        updated:
+          min: 60 # 60 days with no activity
+    on_success:
+      - close:
+          reason: |
+            This PR has been inactive for 60 days and is being closed as abandoned.
+
+            If you'd like to continue working on this, please feel free to reopen the PR or create a new one.
+```
+
+### Enforce Branch Naming
+
+Close PRs with incorrect branch naming:
+
+```yaml
+ruleset:
+  - name: "Branch Naming Enforcement"
+    when:
+      - "pull_request.opened"
+    validate:
+      - type: "branch"
+        head:
+          match: "^(feature|bugfix|hotfix)/[a-z0-9-_]+"
+    on_failure:
+      - close:
+          reason: |
+            This PR has been closed because its branch name doesn't follow our naming convention.
+
+            Branch names should follow the pattern:
+            - `feature/short-description`
+            - `bugfix/short-description`
+            - `hotfix/short-description`
+
+            Please create a new PR with a correctly named branch.
+```
+
+### Close Duplicate PRs
+
+Close PRs detected as duplicates:
+
+```yaml
+ruleset:
+  - name: "Duplicate PR Detection"
+    when:
+      - "pull_request.labeled"
+    if:
+      - type: "label"
+        match: "duplicate"
+    on_success:
+      - close:
+          reason: |
+            This PR has been closed as a duplicate of another PR.
+
+            Please contribute to the discussion on the original PR instead.
+```
+
+## Best Practices
+
+<Check>Provide clear explanations for why PRs are being closed</Check>
+<Check>Be welcoming and constructive in close messages</Check>
+<Check>Offer guidance on how to address the issues</Check>
+<Check>Use only for clear policy violations or abandoned PRs</Check>
+
+<Warning>
+  Automatically closing PRs can be discouraging to contributors - use sparingly and with clear communication
+</Warning>
+
+## Alternatives to Consider
+
+Instead of immediately closing PRs, consider these alternatives:
+
+1. **Comment with guidance**: Explain issues but allow the author to fix them
+2. **Label for visibility**: Add labels like "needs-work" or "invalid"
+3. **Request changes**: Use GitHub's review functionality to request changes
+4. **Set expectations**: Clearly communicate when a PR might be closed
+
+## Template Variables
+
+The Close Action supports these template variables:
+
+| Variable                        | Description                       |
+| ------------------------------- | --------------------------------- |
+| `{{ pull_request.user.login }}` | PR author's username              |
+| `{{ pull_request.title }}`      | PR title                          |
+| `{{ pull_request.body }}`       | PR description                    |
+| `{{ pull_request.number }}`     | PR number                         |
+| `{{ repository.name }}`         | Repository name                   |
+| `{{ repository.full_name }}`    | Full repository name (owner/repo) |
+| `{{ validation_summary }}`      | Summary of all validation results |

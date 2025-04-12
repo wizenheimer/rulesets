@@ -1,0 +1,330 @@
+---
+title: "Checks Action"
+description: "Create GitHub check runs for validation results"
+---
+
+The Checks Action creates or updates GitHub check runs to display validation results directly in the GitHub UI. This provides visible feedback about validation status in the PR itself, making it easy to see whether requirements are met.
+
+## Configuration
+
+<ParamField path="name" type="string" default="PR Validator">
+  Name of the check run
+</ParamField>
+
+<ParamField path="status" type="string" default="completed">
+  Status of the check run ("queued", "in_progress", or "completed")
+</ParamField>
+
+<ParamField path="conclusion" type="string" default="success">
+  Conclusion of the check run when status is "completed" ("success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped")
+</ParamField>
+
+<ParamField path="title" type="string" default="PR Validator">
+  Title displayed in the check run (supports templates)
+</ParamField>
+
+<ParamField path="summary" type="string" default="PR validation complete">
+  Summary displayed in the check run (supports templates)
+</ParamField>
+
+<ParamField path="text" type="string">
+  Detailed text displayed in the check run (supports templates)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_success:
+  - checks:
+      name: "PR Validator"
+      conclusion: "success"
+      title: "All validations passed"
+      summary: "The pull request meets all requirements"
+
+on_failure:
+  - checks:
+      name: "PR Validator"
+      conclusion: "failure"
+      title: "Validation failed"
+      summary: "{{ validation_summary }}"
+```
+
+## Examples
+
+### Simple Status Check
+
+Create a basic pass/fail check:
+
+```yaml
+on_success:
+  - checks:
+      conclusion: "success"
+      title: "PR Validation Passed"
+      summary: "All checks passed successfully!"
+
+on_failure:
+  - checks:
+      conclusion: "failure"
+      title: "PR Validation Failed"
+      summary: "Some checks failed. See details below."
+      text: "{{ validation_summary }}"
+```
+
+### Detailed Validation Report
+
+Provide comprehensive details in the check:
+
+```yaml
+on_failure:
+  - checks:
+      name: "PR Requirements"
+      conclusion: "failure"
+      title: "PR Requirements Not Met"
+      summary: "Your PR doesn't meet all requirements yet."
+      text: |
+        ## Validation Results
+
+        {{ validation_summary }}
+
+        ## How to Fix
+
+        Please review the failed validations above and make the necessary changes to your PR.
+
+        For more information, see our [Contributing Guidelines](CONTRIBUTING.md).
+```
+
+### Multiple Check Types
+
+Create different named checks for different rule types:
+
+```yaml
+ruleset:
+  - name: "Conventional Commits"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+    on_success:
+      - checks:
+          name: "Conventional Format"
+          conclusion: "success"
+          title: "Conventional Format: Passed"
+          summary: "PR title follows the conventional format"
+    on_failure:
+      - checks:
+          name: "Conventional Format"
+          conclusion: "failure"
+          title: "Conventional Format: Failed"
+          summary: "PR title doesn't follow the conventional format"
+
+  - name: "PR Size Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "size"
+        files: 10
+    on_success:
+      - checks:
+          name: "PR Size"
+          conclusion: "success"
+          title: "PR Size: Passed"
+          summary: "PR size is within limits"
+    on_failure:
+      - checks:
+          name: "PR Size"
+          conclusion: "failure"
+          title: "PR Size: Failed"
+          summary: "PR size exceeds limits"
+```
+
+### In-Progress Status
+
+Show a check as in progress while awaiting further validation:
+
+```yaml
+ruleset:
+  - name: "Waiting for CI"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    on_success:
+      - checks:
+          name: "PR Validation"
+          status: "in_progress"
+          title: "Validations in progress"
+          summary: "Waiting for CI tests to complete"
+
+  - name: "CI Complete"
+    when:
+      - "check_suite.completed"
+    validate:
+      - type: "check_suite"
+        status: "success"
+    on_success:
+      - checks:
+          name: "PR Validation"
+          status: "completed"
+          conclusion: "success"
+          title: "All validations passed"
+          summary: "PR meets all requirements including CI tests"
+    on_failure:
+      - checks:
+          name: "PR Validation"
+          status: "completed"
+          conclusion: "failure"
+          title: "CI tests failed"
+          summary: "Please fix the failing CI tests"
+```
+
+## Check Statuses & Conclusions
+
+<Tabs>
+  <Tab title="Statuses">
+    | Status | Description |
+    |--------|-------------|
+    | `queued` | Check has been queued but not started |
+    | `in_progress` | Check is currently running |
+    | `completed` | Check has finished running |
+  </Tab>
+  <Tab title="Conclusions">
+    | Conclusion | Description |
+    |------------|-------------|
+    | `success` | The check completed successfully |
+    | `failure` | The check failed |
+    | `neutral` | The check completed with a neutral result |
+    | `cancelled` | The check was cancelled |
+    | `timed_out` | The check timed out |
+    | `action_required` | The check requires additional action |
+    | `skipped` | The check was skipped |
+  </Tab>
+</Tabs>
+
+## How It Works
+
+<Steps>
+  <Step title="Process Templates">
+    The action processes the title, summary, and text, replacing template variables with actual values
+  </Step>
+  <Step title="Get PR Information">
+    It retrieves the PR's head SHA to associate the check with the correct commit
+  </Step>
+  <Step title="Create Check Run">
+    It creates a new check run with the specified parameters
+  </Step>
+</Steps>
+
+## Template Variables
+
+The Checks Action supports these template variables:
+
+| Variable                        | Description                       |
+| ------------------------------- | --------------------------------- |
+| `{{ pull_request.user.login }}` | PR author's username              |
+| `{{ pull_request.title }}`      | PR title                          |
+| `{{ pull_request.body }}`       | PR description                    |
+| `{{ pull_request.number }}`     | PR number                         |
+| `{{ repository.name }}`         | Repository name                   |
+| `{{ repository.full_name }}`    | Full repository name (owner/repo) |
+| `{{ validation_summary }}`      | Summary of all validation results |
+
+## Practical Use Cases
+
+### Required Checks for Merging
+
+Use the Checks Action to create required status checks for branch protection:
+
+1. Create rules that validate important aspects of your PRs
+2. Use consistent check names in your rules
+3. Configure branch protection to require those status checks
+
+```yaml
+ruleset:
+  - name: "PR Requirements"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.synchronize"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+      - type: "size"
+        files: 10
+      - type: "description"
+        no_empty: true
+    on_success:
+      - checks:
+          name: "PR Requirements"
+          conclusion: "success"
+          title: "PR Requirements: Passed"
+          summary: "All PR requirements have been met"
+    on_failure:
+      - checks:
+          name: "PR Requirements"
+          conclusion: "failure"
+          title: "PR Requirements: Failed"
+          summary: "{{ validation_summary }}"
+```
+
+### Detailed Validation Dashboard
+
+Create a comprehensive check report with rich formatting:
+
+```yaml
+on_failure:
+  - checks:
+      name: "PR Validation Dashboard"
+      conclusion: "failure"
+      title: "PR Validation Results"
+      summary: "Some validations failed. See details below."
+      text: |
+        # PR Validation Results
+
+        ## Summary
+
+        {{ validation_summary }}
+
+        ## PR Details
+
+        - **Author**: {{ pull_request.user.login }}
+        - **Title**: {{ pull_request.title }}
+        - **Number**: #{{ pull_request.number }}
+
+        ## Validation Requirements
+
+        - ✅/❌ PR title follows conventional format
+        - ✅/❌ PR description is complete
+        - ✅/❌ PR size is within limits
+        - ✅/❌ Required labels are present
+
+        ## Next Steps
+
+        1. Review the failed validations above
+        2. Make the necessary changes to your PR
+        3. The checks will automatically update when you push new changes
+```
+
+## Best Practices
+
+<Check>Use consistent check names across related rules</Check>
+<Check>Provide clear, actionable information in check summaries</Check>
+<Check>Use rich Markdown formatting in detailed text</Check>
+<Check>Consider which checks should be required for merging</Check>
+
+<Warning>
+  Don't create too many separate checks, as it can clutter the UI
+</Warning>
+
+## Integration with Branch Protection
+
+To make these checks required for merging:
+
+1. Go to your repository's Settings → Branches → Branch protection rules
+2. Click "Add rule" or edit an existing rule
+3. Check "Require status checks to pass before merging"
+4. Search for and select the check names you've defined in your Rulesets configuration
+5. Save the rule
+
+Now PRs cannot be merged until these checks pass, providing automated enforcement of your validation rules.

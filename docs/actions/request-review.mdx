@@ -1,0 +1,205 @@
+---
+title: "Request Review Action"
+description: "Automatically request reviews for pull requests"
+---
+
+The Request Review Action automatically assigns reviewers to pull requests, helping ensure that PRs get appropriate review from relevant team members or teams.
+
+## Configuration
+
+<ParamField path="reviewers" type="string | string[]">
+  Usernames of individual reviewers to request
+</ParamField>
+
+<ParamField path="teams" type="string | string[]">
+  Team slugs to request reviews from
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_success:
+  - requestReview:
+      reviewers: ["username1", "username2"]
+      teams: ["frontend-team"]
+```
+
+## Examples
+
+### Individual Reviewers
+
+Request reviews from specific individuals:
+
+```yaml
+on_success:
+  - requestReview:
+      reviewers: ["tech-lead", "senior-developer"]
+```
+
+### Team Reviews
+
+Request reviews from entire teams:
+
+```yaml
+on_success:
+  - requestReview:
+      teams: ["frontend-team", "design-team"]
+```
+
+### Special Annotations
+
+Use special annotations for dynamic reviewers:
+
+```yaml
+on_success:
+  - requestReview:
+      reviewers: ["@author"] # Assigns the PR author (useful for FYI reviews)
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Current Reviewers">
+    The action retrieves the list of users and teams already requested as reviewers
+  </Step>
+  <Step title="Process Special Annotations">
+    It processes any special annotations like `@author`
+  </Step>
+  <Step title="Filter Reviewers">
+    It removes any reviewers who have already been requested or can't review (e.g., the PR author can't review their own PR)
+  </Step>
+  <Step title="Request Reviews">
+    If there are new reviewers to request, it sends review requests to them
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Component-Based Reviewers
+
+Assign reviewers based on which components are modified:
+
+```yaml
+ruleset:
+  - name: "Frontend Review"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "src/frontend/.*"
+    on_success:
+      - requestReview:
+          teams: ["frontend-team"]
+          reviewers: ["ui-lead"]
+
+  - name: "Backend Review"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "src/backend/.*"
+    on_success:
+      - requestReview:
+          teams: ["backend-team"]
+          reviewers: ["api-lead"]
+
+  - name: "Database Changes Review"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "src/database/.*"
+    on_success:
+      - requestReview:
+          reviewers: ["database-admin", "schema-owner"]
+```
+
+### Security Review for Sensitive Changes
+
+Request security team review for security-related changes:
+
+```yaml
+ruleset:
+  - name: "Security Review"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "(src/(auth|security)/.*|.*password.*\\.js)"
+    on_success:
+      - requestReview:
+          teams: ["security-team"]
+      - label:
+          add: ["security-review"]
+      - comment:
+          body: |
+            This PR contains changes to security-sensitive code.
+            A security team review has been automatically requested.
+```
+
+### Documentation Review
+
+Request documentation team review for docs changes:
+
+```yaml
+ruleset:
+  - name: "Documentation Review"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "(docs/.*|README\\.md)"
+    on_success:
+      - requestReview:
+          teams: ["docs-team"]
+      - label:
+          add: ["documentation"]
+```
+
+### Random Reviewer Selection
+
+Create a round-robin review system (requires additional setup):
+
+```yaml
+ruleset:
+  - name: "Random Reviewer"
+    when:
+      - "pull_request.opened"
+    on_success:
+      - requestReview:
+          reviewers: ["{{ random_reviewer }}"] # Would require custom implementation
+```
+
+## Best Practices
+
+<Check>Assign reviewers based on code ownership or expertise</Check>
+<Check>Don't overwhelm individuals with too many review requests</Check>
+<Check>Balance team and individual reviewer assignments</Check>
+<Check>Consider workload and timezone differences</Check>
+
+<Warning>
+  Be mindful of reviewer fatigue; rotating reviewers can help distribute the workload
+</Warning>
+
+## Team Assignment Tips
+
+When assigning team reviews:
+
+1. **Team Structure**: Team names are in the format `organization/team-slug`
+2. **Public Teams**: Make sure the teams are visible to the GitHub App
+3. **Manage Expectations**: Set clear expectations about which team members should respond
+4. **Review Policies**: Consider creating team review assignment policies
+
+## Individual Reviewer Tips
+
+When assigning individual reviewers:
+
+1. **Required vs Optional**: Distinguish between required and optional reviewers
+2. **Specialist Reviews**: Assign specialists for specific types of changes
+3. **Cross-Training**: Occasionally assign reviewers from different teams for knowledge sharing
+4. **Backup Reviewers**: Consider assigning backup reviewers for critical changes

@@ -1,0 +1,207 @@
+---
+title: 'Comment Action'
+description: 'Add or update comments on pull requests'
+---
+
+The Comment Action allows you to automatically add or update comments on pull requests based on validation results. This is useful for providing feedback, instructions, or information to PR authors and reviewers.
+
+## Configuration
+
+<ParamField path="body" type="string" required>
+  The content of the comment to add to the PR
+</ParamField>
+
+<ParamField path="create_new" type="boolean" default={true}>
+  Whether to create a new comment (true) or update an existing one (false)
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_failure:
+  - comment:
+      body: "Please fix the issues with your PR"
+```
+
+## Examples
+
+### Simple Comment
+
+Add a basic comment when validations fail:
+
+```yaml
+on_failure:
+  - comment:
+      body: "Your PR doesn't meet our requirements. Please fix the issues."
+```
+
+### Detailed Feedback with Template Variables
+
+Provide detailed feedback using template variables:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        Hello @{{ pull_request.user.login }},
+        
+        Thank you for your PR! There are some issues that need to be addressed:
+        
+        {{ validation_summary }}
+        
+        Please fix these issues and update your PR.
+```
+
+### Updating Existing Comments
+
+Update the bot's previous comment instead of creating a new one:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        # PR Validation Results
+        
+        {{ validation_summary }}
+        
+        _Last updated: {{ current_date }}_
+      create_new: false
+```
+
+### Conditional Success Messages
+
+Provide positive feedback when validations pass:
+
+```yaml
+on_success:
+  - comment:
+      body: |
+        ## All checks passed! ✅
+        
+        Thank you for following our contribution guidelines.
+        A maintainer will review your PR soon.
+```
+
+## Template Variables
+
+The Comment Action supports these template variables:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ pull_request.user.login }}` | PR author's username |
+| `{{ pull_request.title }}` | PR title |
+| `{{ pull_request.body }}` | PR description |
+| `{{ pull_request.number }}` | PR number |
+| `{{ repository.name }}` | Repository name |
+| `{{ repository.full_name }}` | Full repository name (owner/repo) |
+| `{{ validation_summary }}` | Summary of all validation results |
+
+## How It Works
+
+<Steps>
+  <Step title="Process Template">
+    The action processes the comment body, replacing template variables with actual values
+  </Step>
+  <Step title="Check Settings">
+    If `create_new` is false, it looks for a previous comment from the Rulesets bot
+  </Step>
+  <Step title="Update or Create">
+    If an existing bot comment is found (and `create_new` is false), it updates that comment; otherwise, it creates a new comment
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Onboarding New Contributors
+
+Provide guidance to first-time contributors:
+
+```yaml
+ruleset:
+  - name: "First-time Contributor"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        match: "{{ first_time_contributor }}"
+    on_success:
+      - commentbody: |
+            ## Welcome to our project! 👋
+            
+            Thank you for your first contribution!
+            
+            Here are some helpful resources:
+            - [Contribution Guidelines](CONTRIBUTING.md)
+            - [Code of Conduct](CODE_OF_CONDUCT.md)
+            - [Development Setup](docs/development.md)
+            
+            A maintainer will review your PR soon.
+```
+
+### CI Failure Summary
+
+Summarize CI failures to save time:
+
+```yaml
+ruleset:
+  - name: "CI Failure Summary"
+    when:
+      - "check_suite.completed"
+    if:
+      - type: "check_suite"
+        status: "failure"
+    on_success:
+      - comment:
+          body: |
+            ## CI Failures Summary
+            
+            The following CI checks have failed:
+            
+            {{ ci_failures }}
+            
+            Please check the CI logs for details.
+```
+
+### Labeling Explanation
+
+Explain why certain labels were added:
+
+```yaml
+ruleset:
+  - name: "Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "size"
+        files: 10
+        total: 500
+    on_failure:
+      - label:
+          add: ["large-pr"]
+      - comment:
+          body: |
+            ## Large PR Detected
+            
+            This PR has been labeled as `large-pr` because it:
+            {{ validation_summary }}
+            
+            Consider breaking it down into smaller, more focused PRs if possible.
+```
+
+## Best Practices
+
+<Check>Use Markdown formatting to make comments readable and structured</Check>
+<Check>Include actionable feedback that helps contributors fix issues</Check>
+<Check>Use template variables to personalize comments</Check>
+<Check>Set `create_new: false` to avoid cluttering PRs with multiple similar comments</Check>
+
+<Warning>
+  Avoid making comments too verbose or adding them too frequently, as this can be perceived as noisy
+</Warning>
+
+## Limitations
+
+- Comments are always posted from the GitHub App's account
+- Markdown formatting in comments is limited to what GitHub supports
+- Template variables are limited to those provided by Rulesets

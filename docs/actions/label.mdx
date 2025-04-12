@@ -1,0 +1,251 @@
+---
+title: 'Label Action'
+description: 'Automatically add or remove labels'
+---
+
+The Label Action allows you to automatically add or remove labels from pull requests based on validation results. This is useful for categorizing PRs, highlighting issues, or tracking progress through your workflow.
+
+## Configuration
+
+<ParamField path="add" type="string | string[]">
+  Label(s) to add to the PR
+</ParamField>
+
+<ParamField path="remove" type="string | string[]">
+  Label(s) to remove from the PR
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_success:
+  - label:
+      add: ["valid-pr"]
+      remove: ["needs-work"]
+```
+
+## Examples
+
+### Simple Labeling
+
+Add a label when validations pass:
+
+```yaml
+on_success:
+  - label:
+      add: ["ready-for-review"]
+```
+
+### Multiple Labels
+
+Add multiple labels at once:
+
+```yaml
+on_success:
+  - label:
+      add: ["validated", "ready-for-review", "passes-ci"]
+```
+
+### Conditional Labeling
+
+Add different labels based on different rules:
+
+```yaml
+ruleset:
+  - name: "Feature PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "title"
+        match: "^feat: .*"
+    on_success:
+      - label:
+          add: ["feature"]
+
+  - name: "Bug Fix PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "title"
+        match: "^fix: .*"
+    on_success:
+      - label:
+          add: ["bug-fix"]
+```
+
+### State Management
+
+Manage PR state through labels:
+
+```yaml
+ruleset:
+  - name: "PR Approval State"
+    when:
+      - "pull_request_review.submitted"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+    on_success:
+      - label:
+          add: ["approved"]
+          remove: ["needs-review", "changes-requested"]
+    on_failure:
+      - label:
+          add: ["needs-review"]
+          remove: ["approved"]
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Current Labels">
+    The action retrieves the current labels on the PR
+  </Step>
+  <Step title="Calculate Changes">
+    It determines which labels need to be added and which need to be removed
+  </Step>
+  <Step title="Update Labels">
+    It updates the PR with the new set of labels
+  </Step>
+</Steps>
+
+## Use Cases
+
+### Workflow Status
+
+Track PR status in your workflow:
+
+```yaml
+ruleset:
+  - name: "PR Status"
+    when:
+      - "pull_request.*"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .*"
+      - type: "size"
+        files: 15
+    on_success:
+      - label:
+          add: ["ready-for-review"]
+          remove: ["needs-work"]
+    on_failure:
+      - label:
+          add: ["needs-work"]
+          remove: ["ready-for-review"]
+```
+
+### PR Size Categories
+
+Categorize PRs by size:
+
+```yaml
+ruleset:
+  - name: "PR Size - Small"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          max: 5
+        total:
+          max: 100
+    on_success:
+      - label:
+          add: ["size: small"]
+          remove: ["size: medium", "size: large"]
+
+  - name: "PR Size - Medium"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 6
+          max: 15
+        total:
+          min: 101
+          max: 500
+    on_success:
+      - label:
+          add: ["size: medium"]
+          remove: ["size: small", "size: large"]
+
+  - name: "PR Size - Large"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 16
+        total:
+          min: 501
+    on_success:
+      - label:
+          add: ["size: large"]
+          remove: ["size: small", "size: medium"]
+```
+
+### Component Labeling
+
+Automatically label PRs based on the files they change:
+
+```yaml
+ruleset:
+  - name: "Component - Frontend"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/frontend/.*"
+    on_success:
+      - label:
+          add: ["component: frontend"]
+
+  - name: "Component - Backend"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/backend/.*"
+    on_success:
+      - label:
+          add: ["component: backend"]
+
+  - name: "Component - Documentation"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "docs/.*|README\\.md"
+    on_success:
+      - label:
+          add: ["component: docs"]
+```
+
+## Best Practices
+
+<Check>Use consistent label naming schemes</Check>
+<Check>Create labels in your repository before using them in rules</Check>
+<Check>Use color-coding to make labels more visually informative</Check>
+<Check>Document what your labels mean in your contributing guidelines</Check>
+
+<Warning>
+  Avoid creating too many labels, as this can become confusing for contributors
+</Warning>
+
+## Limitations
+
+- Labels must already exist in the repository
+- Label names are case-sensitive
+- You can't create new labels through this action

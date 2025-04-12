@@ -1,0 +1,256 @@
+---
+title: "Assign Action"
+description: "Automatically assign users to pull requests"
+---
+
+The Assign Action allows you to automatically assign users to pull requests based on validation results or other criteria. This helps ensure PRs get the right attention and establishes clear ownership.
+
+## Configuration
+
+<ParamField path="assignees" type="string | string[]">
+  Username(s) to assign to the PR
+</ParamField>
+
+<ParamField path="remove" type="string | string[]">
+  Username(s) to remove from PR assignees
+</ParamField>
+
+## Basic Usage
+
+```yaml
+on_success:
+  - assign:
+      assignees: ["username1", "username2"]
+```
+
+## Examples
+
+### Simple Assignment
+
+Assign specific users to the PR:
+
+```yaml
+on_success:
+  - assign:
+      assignees: ["project-lead", "qa-engineer"]
+```
+
+### Self-Assignment
+
+Assign the PR to its author:
+
+```yaml
+on_success:
+  - assign:
+      assignees: ["@author"]
+```
+
+### Remove Assignees
+
+Remove specific users from PR assignments:
+
+```yaml
+on_success:
+  - assign:
+      remove: ["previous-owner"]
+```
+
+### Combined Assignment
+
+Add and remove assignees in one action:
+
+```yaml
+on_success:
+  - assign:
+      assignees: ["new-owner"]
+      remove: ["previous-owner"]
+```
+
+## Special Annotations
+
+The Assign Action supports special annotations:
+
+| Annotation | Description                  |
+| ---------- | ---------------------------- |
+| `@author`  | Assigns the PR to its author |
+
+## How It Works
+
+<Steps>
+  <Step title="Get Current Assignees">
+    The action retrieves the current list of PR assignees
+  </Step>
+  <Step title="Process Special Annotations">
+    It processes any special annotations like `@author`
+  </Step>
+  <Step title="Add New Assignees">
+    It adds any new assignees specified in `assignees`
+  </Step>
+  <Step title="Remove Assignees">
+    It removes any assignees specified in `remove`
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Content Type Assignment
+
+Assign PRs based on the type of content being changed:
+
+```yaml
+ruleset:
+  - name: "Documentation Assignment"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "docs/.*"
+    on_success:
+      - assign:
+          assignees: ["docs-maintainer"]
+      - label:
+          add: ["documentation"]
+
+  - name: "Frontend Assignment"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "src/frontend/.*"
+    on_success:
+      - assign:
+          assignees: ["frontend-lead"]
+      - label:
+          add: ["frontend"]
+
+  - name: "Backend Assignment"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "src/backend/.*"
+    on_success:
+      - assign:
+          assignees: ["backend-lead"]
+      - label:
+          add: ["backend"]
+```
+
+### PR Size-Based Assignment
+
+Assign different reviewers based on PR size:
+
+```yaml
+ruleset:
+  - name: "Small PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "size"
+        files:
+          max: 5
+    on_success:
+      - assign:
+          assignees: ["junior-reviewer"]
+
+  - name: "Large PR"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "size"
+        files:
+          min: 10
+    on_success:
+      - assign:
+          assignees: ["senior-reviewer", "tech-lead"]
+      - comment:
+          body: "This is a large PR, so both a senior reviewer and tech lead have been assigned."
+```
+
+### Ownership Transition
+
+Transfer ownership when a PR moves to a new stage:
+
+```yaml
+ruleset:
+  - name: "Ready for QA"
+    when:
+      - "pull_request.labeled"
+    if:
+      - type: "label"
+        match: "ready-for-qa"
+    on_success:
+      - assign:
+          assignees: ["qa-engineer"]
+          remove: ["developer"]
+      - comment:
+          body: "This PR is now ready for QA and has been assigned to @qa-engineer."
+```
+
+### Custom Assignment by Author
+
+Assign different reviewers based on the PR author:
+
+```yaml
+ruleset:
+  - name: "Junior Developer PRs"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        match: ["junior-dev-1", "junior-dev-2", "intern"]
+    on_success:
+      - assign:
+          assignees: ["senior-mentor"]
+      - comment:
+          body: "@senior-mentor has been assigned to mentor on this PR."
+
+  - name: "Standard Assignment"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "author"
+        ignore: ["junior-dev-1", "junior-dev-2", "intern"]
+    on_success:
+      - assign:
+          assignees: ["team-lead"]
+```
+
+## Best Practices
+
+<Check>Assign PRs based on relevance and expertise</Check>
+<Check>Avoid assigning too many people to one PR</Check>
+<Check>Balance workload across team members</Check>
+<Check>Have clear ownership transitions</Check>
+
+<Warning>
+  Assignments create expectations - make sure assignees know their responsibilities
+</Warning>
+
+## Benefits of Automated Assignment
+
+- **Clear Ownership**: Establishes who is responsible for the PR
+- **Faster Response**: Gets the right eyes on the PR quickly
+- **Balanced Workload**: Can be used to distribute review work
+- **Streamlined Workflow**: Reduces manual assignment steps
+- **Knowledge Sharing**: Can rotate assignees to spread knowledge
+
+## Assignment vs. Review Requests
+
+GitHub supports both assignees and review requests:
+
+- **Assignees**: People responsible for the PR (typically 1-2 people)
+- **Reviewers**: People asked to review the code (can be multiple)
+
+Consider using the [Request Review Action](/actions/request-review) alongside the Assign Action for a complete workflow:
+
+```yaml
+on_success:
+  - assign:
+      assignees: ["project-owner"] # Overall responsibility
+  - requestReview:
+      reviewers: ["code-reviewer-1", "code-reviewer-2"] # People to review
+```
