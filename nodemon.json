@@ -1,0 +1,11 @@
+{
+    "watch": [
+        "src"
+    ],
+    "ext": "ts,json",
+    "ignore": [
+        "node_modules",
+        "lib"
+    ],
+    "exec": "pnpm run build && pnpm start"
+}
