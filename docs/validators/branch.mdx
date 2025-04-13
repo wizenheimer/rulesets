@@ -1,0 +1,238 @@
+---
+title: "Branch Validator"
+description: "Validate branch naming conventions"
+---
+
+The Branch Validator ensures that the base and head branches of a pull request follow specified naming conventions. This helps maintain consistent branch names that communicate the purpose of changes and follow your team's workflow.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"branch"`
+</ParamField>
+
+<ParamField path="base" type="object">
+  Validation rules for the base branch (the branch you're merging into)
+</ParamField>
+
+<ParamField path="base.match" type="string | string[]">
+  Pattern(s) that the base branch name should match
+</ParamField>
+
+<ParamField path="base.ignore" type="string | string[]">
+  Pattern(s) that the base branch name should not match
+</ParamField>
+
+<ParamField path="base.message" type="string">
+  Custom message for base branch validation failures
+</ParamField>
+
+<ParamField path="head" type="object">
+  Validation rules for the head branch (the branch with your changes)
+</ParamField>
+
+<ParamField path="head.match" type="string | string[]">
+  Pattern(s) that the head branch name should match
+</ParamField>
+
+<ParamField path="head.ignore" type="string | string[]">
+  Pattern(s) that the head branch name should not match
+</ParamField>
+
+<ParamField path="head.message" type="string">
+  Custom message for head branch validation failures
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "branch"
+    head:
+      match: "^(feature|bugfix|hotfix)/[a-z0-9-_]+"
+      message: "Branch name must follow pattern: type/description (e.g., feature/add-login)"
+```
+
+## Examples
+
+### Head Branch Naming Convention
+
+Enforce a specific pattern for feature branches:
+
+```yaml
+validate:
+  - type: "branch"
+    head:
+      match: "^(feature|bugfix|hotfix|release)/[a-z0-9-_]+"
+      message: "Branch name must start with feature/, bugfix/, hotfix/, or release/"
+```
+
+### Protected Base Branches
+
+Ensure PRs only target specific base branches:
+
+```yaml
+validate:
+  - type: "branch"
+    base:
+      match: ["main", "develop", "release-.*"]
+      message: "PRs can only target main, develop, or release branches"
+```
+
+### Prevent Direct Production Changes
+
+Prevent direct PRs to production branches:
+
+```yaml
+validate:
+  - type: "branch"
+    base:
+      match: "production"
+      ignore: true
+      message: "Direct PRs to production are not allowed. Please target staging first."
+```
+
+### Combined Rules
+
+Validate both base and head branches:
+
+```yaml
+validate:
+  - type: "branch"
+    base:
+      match: ["main", "develop"]
+      message: "PRs must target either main or develop"
+    head:
+      match: "^(feature|bugfix|hotfix)/[a-z0-9-_]+"
+      ignore: ["wip/.*", "temp/.*"]
+      message: "Feature branches must follow naming convention and not be WIP or temporary"
+```
+
+## Pattern Matching
+
+The Branch Validator supports several pattern matching methods:
+
+1. **Exact match**: `"main"`
+2. **Glob patterns**: `"release-*"`
+3. **Regular expressions**: `"/^feature\/.*$/"` (enclosed in forward slashes)
+
+## How It Works
+
+<Steps>
+  <Step title="Get Branch Names">
+    The validator extracts the base and head branch names from the PR
+  </Step>
+  <Step title="Validate Base Branch">
+    If base branch rules are specified, checks if the base branch matches requirements
+  </Step>
+  <Step title="Validate Head Branch">
+    If head branch rules are specified, checks if the head branch matches requirements
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### GitFlow Branch Validation
+
+Enforce GitFlow workflow branch naming:
+
+```yaml
+ruleset:
+  - name: "GitFlow Branch Names"
+    when:
+      - "pull_request.opened"
+    validate:
+      - type: "branch"
+        base:
+          match: ["main", "develop", "release-.*"]
+          message: "Base branch must be main, develop, or a release branch"
+        head:
+          match: "^(feature|bugfix|hotfix|release)/[a-z0-9-_]+"
+          message: "Branch names must follow GitFlow convention: type/description"
+    on_failure:
+      - comment:
+          body: |
+            ## Invalid Branch Name
+
+            Please follow our GitFlow branch naming conventions:
+
+            - Feature branches: `feature/description`
+            - Bug fixes: `bugfix/description`
+            - Hotfixes: `hotfix/description`
+            - Release branches: `release/version`
+
+            {{ validation_summary }}
+```
+
+### Jira Issue References
+
+Enforce Jira issue IDs in branch names:
+
+```yaml
+validate:
+  - type: "branch"
+    head:
+      match: "^(feature|bugfix|hotfix)/[A-Z]+-[0-9]+-[a-z0-9-]+"
+      message: "Branch name must include Jira issue ID (e.g., feature/PROJ-123-description)"
+```
+
+### Different Rules by Team
+
+Apply different branch naming rules for different parts of the codebase:
+
+```yaml
+ruleset:
+  - name: "Frontend Branch Names"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "frontend/.*"
+    validate:
+      - type: "branch"
+        head:
+          match: "^frontend/(feature|bugfix)/[a-z0-9-_]+"
+    on_failure:
+      - comment:
+          body: "Frontend branches should follow pattern: frontend/type/description"
+
+  - name: "Backend Branch Names"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "files"
+        modified:
+          match: "backend/.*"
+    validate:
+      - type: "branch"
+        head:
+          match: "^backend/(feature|bugfix)/[a-z0-9-_]+"
+    on_failure:
+      - comment:
+          body: "Backend branches should follow pattern: backend/type/description"
+```
+
+## Best Practices
+
+<Check>Document your branch naming conventions in your contributing guidelines</Check>
+<Check>Use clear, descriptive patterns that communicate the intent</Check>
+<Check>Consider your Git workflow (GitFlow, GitHub Flow, etc.) when defining conventions</Check>
+<Check>Provide helpful error messages explaining the expected format</Check>
+
+<Warning>
+  Be aware that branch names are case-sensitive in Git/GitHub
+</Warning>
+
+## Branch Naming Strategy Tips
+
+Effective branch names should:
+
+1. **Indicate purpose**: Use prefixes like `feature/`, `bugfix/`, `hotfix/`
+2. **Reference context**: Include ticket numbers or brief descriptions
+3. **Use separators consistently**: Choose either hyphens or underscores
+4. **Be reasonably concise**: Avoid overly long branch names
+5. **Avoid spaces and special characters**: Use dashes or underscores instead

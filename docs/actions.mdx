@@ -1,0 +1,184 @@
+---
+title: "Actions"
+description: "Automated actions to take on validation results"
+---
+
+Actions are automated tasks that Rulesets performs based on validation results. The `on_success` and `on_failure` properties of a rule define which actions to take when validations pass or fail.
+
+## Action Structure
+
+Actions are defined in the `on_success` and `on_failure` arrays:
+
+```yaml
+on_success:
+  - action1:
+      # action parameters
+  - action2:
+      # action parameters
+
+on_failure:
+  - action3:
+      # action parameters
+  - action4:
+      # action parameters
+```
+
+Each action has a type (its key) and type-specific parameters.
+
+## Available Action Types
+
+<CardGroup cols={2}>
+  <Card title="Comment" icon="comment" href="/actions/comment">
+    Add or update a comment on the PR
+  </Card>
+  <Card title="Label" icon="tag" href="/actions/label">
+    Add or remove labels from the PR
+  </Card>
+  <Card title="Assign" icon="user-plus" href="/actions/assign">
+    Assign users to the PR
+  </Card>
+  <Card title="Request Review" icon="eye" href="/actions/request-review">
+    Request reviews from users or teams
+  </Card>
+  <Card title="Checks" icon="check-circle" href="/actions/checks">
+    Create or update check runs
+  </Card>
+  <Card title="Close" icon="door-closed" href="/actions/close">
+    Close the PR
+  </Card>
+  <Card title="Merge" icon="code-merge" href="/actions/merge">
+    Merge the PR
+  </Card>
+</CardGroup>
+
+## Templates
+
+Actions support template variables that are replaced with dynamic content:
+
+- `{{ pull_request.user.login }}` - PR author's username
+- `{{ pull_request.title }}` - PR title
+- `{{ pull_request.body }}` - PR description
+- `{{ pull_request.number }}` - PR number
+- `{{ repository.name }}` - Repository name
+- `{{ repository.full_name }}` - Full repository name (owner/repo)
+- `{{ validation_summary }}` - Summary of all validation results
+
+## Example Use Cases
+
+### Adding Comments
+
+Provide feedback on validation results:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        Thanks for your contribution! Please address the following issues:
+
+        {{ validation_summary }}
+
+        Feel free to ask if you need any help.
+```
+
+### Managing Labels
+
+Add or remove labels based on validation results:
+
+```yaml
+on_success:
+  - label:
+      add: ["ready-for-review"]
+      remove: ["needs-work"]
+
+on_failure:
+  - label:
+      add: ["needs-work"]
+      remove: ["ready-for-review"]
+```
+
+### Requesting Reviews
+
+Automatically request reviews when validations pass:
+
+```yaml
+on_success:
+  - requestReview:
+      reviewers: ["username1", "username2"]
+      teams: ["team-name"]
+```
+
+### Creating Checks
+
+Update GitHub Checks with validation results:
+
+```yaml
+on_success:
+  - checks:
+      name: "PR Validator"
+      conclusion: "success"
+      title: "PR Validation Passed"
+      summary: "All checks passed successfully!"
+
+on_failure:
+  - checks:
+      name: "PR Validator"
+      conclusion: "failure"
+      title: "PR Validation Failed"
+      summary: "{{ validation_summary }}"
+```
+
+## Advanced Example
+
+A comprehensive automation workflow:
+
+```yaml
+ruleset:
+  - name: "Production PR Workflow"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronized"
+      - "pull_request_review.submitted"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+      - type: "approvals"
+        count:
+          min: 2
+        require_code_owners: true
+    on_success:
+      - label:
+          add: ["approved"]
+          remove: ["needs-review", "needs-revision"]
+      - checks:
+          name: "PR Validator"
+          conclusion: "success"
+          title: "Ready to Merge"
+          summary: "This PR has been approved and is ready to merge."
+    on_failure:
+      - label:
+          add: ["needs-revision"]
+          remove: ["approved"]
+      - comment:
+          body: |
+            This PR needs some changes before it can be merged:
+
+            {{ validation_summary }}
+
+            Please update your PR to address these issues.
+      - checks:
+          name: "PR Validator"
+          conclusion: "failure"
+          title: "Changes Required"
+          summary: "{{ validation_summary }}"
+```
+
+This example creates a complete workflow for production PRs that:
+
+1. Validates PR title format and required approvals
+2. Manages labels based on validation status
+3. Adds comments with feedback when validation fails
+4. Creates check runs to show status in GitHub UI

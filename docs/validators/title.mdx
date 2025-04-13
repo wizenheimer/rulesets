@@ -1,0 +1,165 @@
+---
+title: "Title Validator"
+description: "Validate PR title format and content"
+---
+
+The Title Validator checks if a pull request's title meets specified requirements, such as following a pattern, having a minimum or maximum length, or containing specific text.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"title"`
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Regex pattern(s) that the title should match
+</ParamField>
+
+<ParamField path="length" type="object">
+  Title length constraints
+</ParamField>
+
+<ParamField path="length.min" type="number">
+  Minimum title length in characters
+</ParamField>
+
+<ParamField path="length.max" type="number">
+  Maximum title length in characters
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "title"
+    match: "^(feat|fix|docs): .+"
+    message: "PR title must start with feat:, fix:, or docs:"
+```
+
+## Examples
+
+### Conventional Commits Format
+
+Validate that PR titles follow the Conventional Commits format:
+
+```yaml
+validate:
+  - type: "title"
+    match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+    message: "PR title must follow conventional commit format: type(scope): description"
+```
+
+### Title Length Requirements
+
+Ensure titles are neither too short nor too long:
+
+```yaml
+validate:
+  - type: "title"
+    length:
+      min: 10
+      max: 100
+    message: "PR title must be between 10 and 100 characters"
+```
+
+### Multiple Patterns
+
+Allow multiple title formats:
+
+```yaml
+validate:
+  - type: "title"
+    match:
+      - "^\\[BUG\\] .+"
+      - "^\\[FEATURE\\] .+"
+      - "^\\[DOCS\\] .+"
+    message: "PR title must start with [BUG], [FEATURE], or [DOCS]"
+```
+
+### Combined Requirements
+
+Combine pattern matching and length requirements:
+
+```yaml
+validate:
+  - type: "title"
+    match: "^(feat|fix|docs): .+"
+    length:
+      min: 10
+    message: "PR title must start with type prefix and be at least 10 characters"
+```
+
+## Pattern Matching
+
+The Title Validator uses JavaScript regular expressions for pattern matching. When specifying patterns, remember:
+
+- Patterns are case-sensitive by default
+- Some characters need to be escaped with a backslash (`\`)
+- In YAML, backslashes need to be double escaped (`\\`)
+
+For case-insensitive matching, use the `i` flag: `"/pattern/i"`
+
+## How It Works
+
+<Steps>
+  <Step title="Retrieve PR Title">
+    The validator retrieves the PR title from the GitHub event context
+  </Step>
+  <Step title="Check Pattern">
+    If `match` is specified, it checks if the title matches any of the regex patterns
+  </Step>
+  <Step title="Check Length">
+    If `length` is specified, it verifies the title length is within the specified range
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Complete Rule Example
+
+```yaml
+ruleset:
+  - name: "PR Title Convention"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs)(\\(\\w+\\))?: .+"
+        length:
+          min: 10
+          max: 100
+        message: "PR title must follow the format: type(scope): description"
+    on_success:
+      - label:
+          add: ["valid-title"]
+    on_failure:
+      - comment:
+          body: |
+            Please update your PR title to follow our conventions:
+
+            - Start with a type: `feat`, `fix`, or `docs`
+            - Optionally include a scope in parentheses
+            - Add a colon and a space
+            - Write a description (at least 10 characters)
+
+            Example: `feat(auth): implement login functionality`
+
+            {{ validation_summary }}
+```
+
+## Best Practices
+
+<Check>Use clear and consistent title patterns across your repositories</Check>
+<Check>Provide helpful error messages explaining the expected format</Check>
+<Check>Consider combining with the commit validator for consistency</Check>
+<Check>Set reasonable length limits that allow for informative titles</Check>
+
+<Warning>
+  Complex regex patterns may be difficult for contributors to understand; provide clear examples
+</Warning>

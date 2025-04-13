@@ -1,0 +1,170 @@
+---
+title: "Commit Validator"
+description: "Validate commit message format and content"
+---
+
+The Commit Validator ensures that commit messages in a pull request follow specified patterns or formats, helping maintain a consistent commit history in your repository.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"commit"`
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Regex pattern(s) that commit messages should match
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Regex pattern(s) for commit messages to ignore
+</ParamField>
+
+<ParamField path="ignore_merge_commits" type="boolean">
+  Skip validation for merge commits (starting with "Merge ")
+</ParamField>
+
+<ParamField path="first_only" type="boolean">
+  Only validate the first commit in the PR
+</ParamField>
+
+<ParamField path="last_only" type="boolean">
+  Only validate the last commit in the PR
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^(feat|fix|docs): .+"
+    ignore_merge_commits: true
+```
+
+## Examples
+
+### Conventional Commits Format
+
+Validate that commit messages follow the Conventional Commits format:
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+    ignore_merge_commits: true
+    message: "Commit messages must follow conventional commit format: type(scope): description"
+```
+
+### Issue Reference Required
+
+Ensure commits reference an issue number:
+
+```yaml
+validate:
+  - type: "commit"
+    match: ".*\\(#\\d+\\)$"
+    message: "Commit messages must reference an issue number at the end, e.g., 'Fix login bug (#123)'"
+```
+
+### Validate Only the Last Commit
+
+For squash-and-merge workflows, you might only care about the last commit:
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^(feat|fix|docs): .+"
+    last_only: true
+    message: "The last commit message must follow the required format"
+```
+
+### Ignore Certain Commit Patterns
+
+Skip validation for certain types of commits:
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^[A-Z].*"
+    ignore: "^(Merge |Revert |Automated )"
+    ignore_merge_commits: true
+    message: "Commit messages must start with a capital letter"
+```
+
+## Pattern Matching
+
+The Commit Validator uses JavaScript regular expressions for pattern matching. When specifying patterns, remember:
+
+- Patterns are case-sensitive by default
+- Some characters need to be escaped with a backslash (`\`)
+- In YAML, backslashes need to be double escaped (`\\`)
+
+For case-insensitive matching, use the `i` flag: `"/pattern/i"`
+
+## How It Works
+
+<Steps>
+  <Step title="Retrieve Commits">
+    The validator fetches all commits in the PR from the GitHub API
+  </Step>
+  <Step title="Filter Commits">
+    Applies filtering based on `ignore_merge_commits`, `first_only`, or `last_only` settings
+  </Step>
+  <Step title="Check Patterns">
+    For each commit, checks if the message matches required patterns and doesn't match ignored patterns
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message listing any non-conforming commits
+  </Step>
+</Steps>
+
+## Complete Rule Example
+
+````yaml
+ruleset:
+  - name: "Conventional Commits"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "commit"
+        match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+        ignore_merge_commits: true
+        message: "Commit messages must follow the conventional commit format"
+    on_success:
+      - label:
+          add: ["conventional-commits"]
+    on_failure:
+      - comment:
+          body: |
+            Please ensure all your commit messages follow the conventional commit format:
+
+            ```
+            <type>(<optional scope>): <description>
+
+            [optional body]
+
+            [optional footer(s)]
+            ```
+
+            Where `type` is one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+            Example: `feat(auth): implement login functionality`
+
+            The following commits don't follow this format:
+            {{ validation_summary }}
+````
+
+## Best Practices
+
+<Check>Enable `ignore_merge_commits` to avoid validation errors on automated merge commits</Check>
+<Check>Provide helpful error messages explaining the expected format</Check>
+<Check>Consider combining with the title validator for a consistent history</Check>
+<Check>For squash-and-merge workflows, use `last_only: true`</Check>
+
+<Warning>
+  Complex validation rules may be frustrating for contributors; consider providing commit message templates
+</Warning>

@@ -1,0 +1,209 @@
+---
+title: "Dependent Files Validator"
+description: "Ensure related files are included in the PR"
+---
+
+The Dependent Files Validator ensures that when certain files are modified, other related files are also included in the PR. This is useful for enforcing patterns like test coverage, documentation updates, or ensuring configuration changes are synchronized.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"dependent"`
+</ParamField>
+
+<ParamField path="files" type="array">
+  Configuration for dependent file relationships
+</ParamField>
+
+<ParamField path="files[].when" type="string">
+  Pattern matching files that trigger the dependency check
+</ParamField>
+
+<ParamField path="files[].require" type="string | string[]">
+  Pattern(s) for files that must be included when matching files are changed
+</ParamField>
+
+<ParamField path="files[].message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+<ParamField path="message" type="string">
+  Default message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/(.+)\\.js$"
+        require: "test/$1.test.js"
+        message: "Source files must have corresponding test files"
+```
+
+## Examples
+
+### Test Coverage Enforcement
+
+Require test files for source code changes:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/(.+)\\.js$"
+        require: "test/$1.test.js"
+        message: "JavaScript files require corresponding test files"
+```
+
+### Multiple Required Files
+
+Require multiple related files to be updated together:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "config/database.yml"
+        require: ["config/database.example.yml", "docs/database-config.md"]
+        message: "When updating database config, also update example and documentation"
+```
+
+### Multiple Dependencies
+
+Define different dependencies for different file types:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/api/(.+)\\.ts$"
+        require: "test/api/$1.test.ts"
+        message: "API endpoints require tests"
+
+      - when: "src/components/(.+)\\.tsx$"
+        require: "src/components/$1.stories.tsx"
+        message: "React components require Storybook stories"
+
+      - when: "package.json"
+        require: "package-lock.json"
+        message: "Update package-lock.json when changing dependencies"
+```
+
+### Using Placeholders
+
+Use `$` placeholder to reference the base filename:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/models/(.+)\\.ts$"
+        require: "src/schemas/$.schema.ts"
+        message: "Model changes require schema updates"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Changed Files">
+    The validator retrieves all files changed in the PR
+  </Step>
+  <Step title="Process Dependencies">
+    For each dependency rule:
+    1. Find files matching the "when" pattern
+    2. For each match, determine the required corresponding files
+    3. Check if these required files are included in the PR
+  </Step>
+  <Step title="Handle Placeholders">
+    Replaces placeholders ($1, $2, etc.) with captured groups from the pattern match
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Pattern Matching
+
+The Dependent Files Validator uses JavaScript regular expressions with capture groups:
+
+- `src/(.+)\.js$` captures the path and filename (without extension) in `$1`
+- `test/$1.test.js` uses the captured value to construct the expected test file path
+
+## Practical Use Cases
+
+### API and Documentation Sync
+
+Ensure API changes are documented:
+
+```yaml
+ruleset:
+  - name: "API Documentation Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "dependent"
+        files:
+          - when: "src/api/v1/(.+)\\.js$"
+            require: "docs/api/v1/$1.md"
+    on_failure:
+      - label:
+          add: ["needs-docs"]
+      - comment:
+          body: |
+            API changes require documentation updates.
+
+            {{ validation_summary }}
+
+            Please update the corresponding documentation files.
+```
+
+### Schema and Migration Files
+
+Ensure database schema changes include migrations:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/schemas/(.+)\\.ts$"
+        require: "src/migrations/\\d{14}_$1.ts"
+        message: "Schema changes require a corresponding migration file"
+```
+
+### Component and Test Updates
+
+Enforce complete component updates:
+
+```yaml
+validate:
+  - type: "dependent"
+    files:
+      - when: "src/components/(.+)Component\\.tsx$"
+        require:
+          [
+            "src/components/$1Component.test.tsx",
+            "src/components/$1Component.css",
+            "src/components/$1Component.stories.tsx",
+          ]
+        message: "Component changes must include tests, styles, and stories"
+```
+
+## Best Practices
+
+<Check>Use clear patterns with capture groups to establish relationships</Check>
+<Check>Provide helpful error messages explaining the relationship</Check>
+<Check>Consider the structure of your codebase when defining dependencies</Check>
+<Check>Group related dependencies in one validator for clarity</Check>
+
+<Warning>
+  Be careful with complex patterns that might be difficult for contributors to understand
+</Warning>
+
+## Limitations
+
+- Regular expressions can become complex for deeply nested directory structures
+- Dependencies must be expressed as deterministic patterns
+- Capturing multiple directory levels can be tricky

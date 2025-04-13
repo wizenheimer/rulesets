@@ -1,0 +1,245 @@
+---
+title: "Description Validator"
+description: "Validate PR description content and format"
+---
+
+The Description Validator ensures that pull request descriptions meet specified requirements, such as minimum length, required sections, or specific content patterns. This helps maintain informative PR descriptions that provide adequate context for reviewers.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"description"`
+</ParamField>
+
+<ParamField path="no_empty" type="boolean">
+  Whether empty descriptions are allowed (true = not allowed)
+</ParamField>
+
+<ParamField path="length" type="object">
+  Description length constraints
+</ParamField>
+
+<ParamField path="length.min" type="number">
+  Minimum description length in characters
+</ParamField>
+
+<ParamField path="length.max" type="number">
+  Maximum description length in characters
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Regex pattern(s) that the description should match
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "description"
+    no_empty: true
+    length:
+      min: 50
+    message: "Please provide a meaningful PR description (minimum 50 characters)"
+```
+
+## Examples
+
+### Require Non-Empty Description
+
+Ensure PR descriptions aren't empty:
+
+```yaml
+validate:
+  - type: "description"
+    no_empty: true
+    message: "PR description cannot be empty"
+```
+
+### Minimum Description Length
+
+Require detailed descriptions:
+
+```yaml
+validate:
+  - type: "description"
+    length:
+      min: 100
+    message: "PR description must be at least 100 characters"
+```
+
+### Pattern Matching
+
+Require specific sections in the description:
+
+```yaml
+validate:
+  - type: "description"
+    match: "(What|Why|How).*"
+    message: "PR description must include What, Why, or How sections"
+```
+
+### Multiple Requirements
+
+Combine multiple requirements:
+
+```yaml
+validate:
+  - type: "description"
+    no_empty: true
+    length:
+      min: 50
+      max: 2000
+    match: "## (Background|Changes|Testing)"
+    message: "PR description must include Background, Changes, or Testing sections and be 50-2000 characters"
+```
+
+## Pattern Matching
+
+The Description Validator uses JavaScript regular expressions for pattern matching:
+
+- Patterns are case-sensitive by default
+- Use `i` flag for case-insensitive matching: `"/pattern/i"`
+- You can specify multiple patterns as an array
+- Pattern matching is done against the entire description
+
+## How It Works
+
+<Steps>
+  <Step title="Retrieve Description">
+    The validator retrieves the PR description from the GitHub event context
+  </Step>
+  <Step title="Check Empty">
+    If `no_empty` is true, checks if the description is empty
+  </Step>
+  <Step title="Check Length">
+    If `length` is specified, verifies the description length is within the specified range
+  </Step>
+  <Step title="Check Pattern">
+    If `match` is specified, checks if the description matches any of the regex patterns
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Structured Description Template
+
+Enforce a structured PR description format:
+
+````yaml
+ruleset:
+  - name: "PR Description Format"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "description"
+        match: "## What(.|\n)*## Why(.|\n)*## How"
+        message: "PR description must include What, Why, and How sections"
+    on_failure:
+      - comment:
+          body: |
+            Please structure your PR description with the following sections:
+
+            ```
+            ## What
+            [Description of the changes]
+
+            ## Why
+            [Reason for the changes]
+
+            ## How
+            [How you implemented the changes]
+            ```
+````
+
+### Issue Reference Check
+
+Ensure PR descriptions reference an issue:
+
+```yaml
+validate:
+  - type: "description"
+    match: "(fixes|closes|resolves) #\\d+"
+    message: "PR description must reference an issue (e.g., 'fixes #123')"
+```
+
+### Testing Information
+
+Require information about testing:
+
+```yaml
+validate:
+  - type: "description"
+    match: "## (Testing|Test Plan)"
+    message: "PR description must include a Testing or Test Plan section"
+```
+
+### Different Requirements by Branch
+
+Apply stricter requirements for production branches:
+
+```yaml
+ruleset:
+  - name: "Main Branch Description"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "description"
+        no_empty: true
+        length:
+          min: 200
+        match: "## (Summary|Changes|Testing|Risks)"
+    on_failure:
+      - comment:
+          body: "PRs to main branch require detailed descriptions with Summary, Changes, Testing, and Risks sections"
+
+  - name: "Development Branch Description"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "description"
+        no_empty: true
+        length:
+          min: 50
+    on_failure:
+      - comment:
+          body: "PRs to develop branch require a description of at least 50 characters"
+```
+
+## Best Practices
+
+<Check>Provide a PR template to guide contributors</Check>
+<Check>Keep requirements reasonable and aligned with your team's workflow</Check>
+<Check>Give clear feedback when validation fails</Check>
+<Check>Consider different requirements for different types of changes</Check>
+
+<Warning>
+  Very strict requirements might frustrate contributors, especially for simple changes
+</Warning>
+
+## Template Integration
+
+To maximize effectiveness, combine this validator with a PR template in your repository:
+
+1. Create a file at `.github/PULL_REQUEST_TEMPLATE.md`
+2. Include the required sections and guidance
+3. Configure the validator to check for these sections
+
+This way, contributors automatically get a template that helps them meet your requirements.

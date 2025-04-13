@@ -1,0 +1,404 @@
+---
+title: "Automatic Labeling Example"
+description: "Automatically categorize PRs with intelligent labeling"
+---
+
+This example shows how to implement comprehensive automatic labeling for pull requests based on various criteria including files changed, PR size, author team, and more.
+
+## Configuration
+
+```yaml
+ruleset:
+  # File-Based Auto-Labeling
+  - name: "Component Labeling"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    on_success:
+      - label:
+          remove:
+            [
+              "component: frontend",
+              "component: backend",
+              "component: docs",
+              "component: infra",
+            ]
+
+  - name: "Frontend Changes"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["src/frontend/.*", ".*\\.(js|jsx|ts|tsx|css|scss)$"]
+    on_success:
+      - label:
+          add: ["component: frontend"]
+
+  - name: "Backend Changes"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["src/backend/.*", ".*\\.(java|go|py|rb)$"]
+    on_success:
+      - label:
+          add: ["component: backend"]
+
+  - name: "Documentation Changes"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: ["docs/.*", "README\\.md", ".*\\.md"]
+    on_success:
+      - label:
+          add: ["component: docs"]
+
+  - name: "Infrastructure Changes"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match:
+            [
+              "infra/.*",
+              ".*\\.(yaml|yml|tf)$",
+              "Dockerfile",
+              "docker-compose\\.yml",
+            ]
+    on_success:
+      - label:
+          add: ["component: infra"]
+
+  # Size-Based Labeling
+  - name: "PR Size Labeling"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    on_success:
+      - label:
+          remove:
+            ["size: small", "size: medium", "size: large", "size: x-large"]
+
+  - name: "Small PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          max: 3
+        total:
+          max: 100
+    on_success:
+      - label:
+          add: ["size: small"]
+
+  - name: "Medium PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 4
+          max: 10
+        total:
+          min: 101
+          max: 300
+    on_success:
+      - label:
+          add: ["size: medium"]
+
+  - name: "Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 11
+          max: 20
+        total:
+          min: 301
+          max: 500
+    on_success:
+      - label:
+          add: ["size: large"]
+
+  - name: "X-Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 21
+        total:
+          min: 501
+    on_success:
+      - label:
+          add: ["size: x-large"]
+```
+
+## How It Works
+
+This ruleset implements automatic labeling in two categories:
+
+1. **Component Labeling**: Labels PRs based on the types of files changed (frontend, backend, docs, infrastructure)
+2. **Size Labeling**: Labels PRs based on their size (small, medium, large, x-large)
+
+The rules are designed to update the labels whenever a PR is opened or synchronized (new commits pushed).
+
+## Extending the Example
+
+### Change Type Labeling
+
+Add labels based on the type of change:
+
+```yaml
+ruleset:
+  - name: "Bug Fix Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^fix: "
+    on_success:
+      - label:
+          add: ["type: bug"]
+
+  - name: "Feature Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^feat: "
+    on_success:
+      - label:
+          add: ["type: feature"]
+
+  - name: "Docs Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^docs: "
+    on_success:
+      - label:
+          add: ["type: docs"]
+
+  - name: "Refactor Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^refactor: "
+    on_success:
+      - label:
+          add: ["type: refactor"]
+```
+
+### Team-Based Labeling
+
+Add labels based on the author's team:
+
+```yaml
+ruleset:
+  - name: "Team Labeling"
+    when:
+      - "pull_request.opened"
+    on_success:
+      - label:
+          remove:
+            ["team: frontend", "team: backend", "team: devops", "team: qa"]
+
+  - name: "Frontend Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/frontend-team"
+    on_success:
+      - label:
+          add: ["team: frontend"]
+
+  - name: "Backend Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/backend-team"
+    on_success:
+      - label:
+          add: ["team: backend"]
+
+  - name: "DevOps Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/devops-team"
+    on_success:
+      - label:
+          add: ["team: devops"]
+
+  - name: "QA Team Label"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "myorg/qa-team"
+    on_success:
+      - label:
+          add: ["team: qa"]
+```
+
+### Priority Labeling
+
+Add priority labels based on PR description:
+
+```yaml
+ruleset:
+  - name: "Priority Labeling"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    on_success:
+      - label:
+          remove: ["priority: high", "priority: medium", "priority: low"]
+
+  - name: "High Priority Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "Priority: High|High Priority|Urgent|Critical"
+    on_success:
+      - label:
+          add: ["priority: high"]
+
+  - name: "Medium Priority Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "Priority: Medium|Medium Priority"
+    on_success:
+      - label:
+          add: ["priority: medium"]
+
+  - name: "Low Priority Label"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "description"
+        match: "Priority: Low|Low Priority"
+    on_success:
+      - label:
+          add: ["priority: low"]
+```
+
+### Status Labeling
+
+Add status labels based on validation results:
+
+```yaml
+ruleset:
+  - name: "PR Validation"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "pull_request_review.submitted"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert): .+"
+      - type: "approvals"
+        count:
+          min: 2
+    on_success:
+      - label:
+          add: ["status: ready"]
+          remove: ["status: needs-work", "status: review-required"]
+    on_failure:
+      - label:
+          add: ["status: needs-work"]
+          remove: ["status: ready"]
+```
+
+## Best Practices for Label Management
+
+<Check>Create labels in your repository before using them in rules</Check>
+<Check>Use a consistent naming scheme (e.g., "category: value")</Check>
+<Check>Use colors to visually distinguish label categories</Check>
+<Check>Document your labeling scheme for contributors</Check>
+
+<Warning>
+  Don't create too many labels or overly complex labeling rules, as they can become difficult to maintain
+</Warning>
+
+## Setting Up Required Labels
+
+Before using this ruleset, create these labels in your repository:
+
+1. Component labels:
+
+   - `component: frontend` (color: #0366d6)
+   - `component: backend` (color: #6f42c1)
+   - `component: docs` (color: #0075ca)
+   - `component: infra` (color: #d73a4a)
+
+2. Size labels:
+
+   - `size: small` (color: #c2e0c6)
+   - `size: medium` (color: #fbca04)
+   - `size: large` (color: #f9d0c4)
+   - `size: x-large` (color: #e99695)
+
+3. Type labels:
+
+   - `type: bug` (color: #d73a4a)
+   - `type: feature` (color: #0075ca)
+   - `type: docs` (color: #0366d6)
+   - `type: refactor` (color: #6f42c1)
+
+4. Team labels:
+
+   - `team: frontend` (color: #bfdadc)
+   - `team: backend` (color: #c5def5)
+   - `team: devops` (color: #dbedff)
+   - `team: qa` (color: #d4c5f9)
+
+5. Priority labels:
+
+   - `priority: high` (color: #d73a4a)
+   - `priority: medium` (color: #fbca04)
+   - `priority: low` (color: #0e8a16)
+
+6. Status labels:
+   - `status: ready` (color: #0e8a16)
+   - `status: needs-work` (color: #fbca04)
+   - `status: review-required` (color: #d4c5f9)
+
+## Benefits of Automatic Labeling
+
+- **Consistency**: Ensures PRs are labeled consistently according to rules
+- **Visibility**: Makes it easy to filter and search PRs
+- **Workflow Integration**: Labels can be used to drive other automations
+- **Reduced Manual Work**: Eliminates the need for manual labeling
+- **Better Organization**: Helps teams manage large volumes of PRs

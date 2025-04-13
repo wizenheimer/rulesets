@@ -1,0 +1,260 @@
+---
+title: "Task List Validator"
+description: "Validate task list completion in PR descriptions"
+---
+
+The Task List Validator ensures that task lists (checkboxes) in pull request descriptions are completed. This is useful for enforcing pre-merge checklists, ensuring contributors follow important steps before their PRs are merged.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"taskList"`
+</ParamField>
+
+<ParamField path="include" type="string | string[]">
+  Section heading patterns to validate (checks task lists in these sections)
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "taskList"
+    include: ["Checklist"]
+    message: "Please complete all items in the PR checklist"
+```
+
+## Examples
+
+### Simple Checklist Validation
+
+Ensure all tasks in the "Checklist" section are completed:
+
+```yaml
+validate:
+  - type: "taskList"
+    include: "Checklist"
+    message: "Please complete all items in the PR checklist"
+```
+
+### Multiple Sections
+
+Check tasks in multiple sections:
+
+```yaml
+validate:
+  - type: "taskList"
+    include: ["Prerequisites", "Testing Checklist", "Documentation"]
+    message: "Please complete all tasks in the required sections"
+```
+
+### Pattern Matching
+
+Use patterns to match section headings:
+
+```yaml
+validate:
+  - type: "taskList"
+    include: [".*Checklist.*", "Pre-?merge( Tasks)?"]
+    message: "Please complete all pre-merge tasks"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Parse Description">
+    The validator parses the PR description to identify markdown sections and task lists
+  </Step>
+  <Step title="Identify Sections">
+    It identifies sections that match the patterns specified in `include`
+  </Step>
+  <Step title="Check Task Lists">
+    For each matching section, it verifies all task list items are checked
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+The validator looks for Markdown task lists in the format:
+
+```markdown
+- [ ] Unchecked task
+- [x] Checked task
+```
+
+## Example PR Template
+
+To make the most of this validator, create a PR template with task lists:
+
+```markdown
+## Description
+
+[Describe your changes here]
+
+## Checklist
+
+- [ ] Code follows the style guidelines
+- [ ] I have performed a self-review
+- [ ] I have added tests for my changes
+- [ ] Documentation has been updated
+- [ ] The build passes locally
+```
+
+Save this template as `.github/PULL_REQUEST_TEMPLATE.md` in your repository.
+
+## Practical Use Cases
+
+### Pre-Merge Checklist
+
+Ensure contributors confirm important checks before merging:
+
+```yaml
+ruleset:
+  - name: "Pre-Merge Checklist"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.ready_for_review"
+    validate:
+      - type: "taskList"
+        include: "Checklist"
+    on_failure:
+      - label:
+          add: ["checklist-incomplete"]
+      - comment:
+          body: |
+            ## Incomplete Checklist
+
+            Please complete all items in the PR checklist before requesting review.
+
+            This helps ensure all our quality standards are met.
+```
+
+### Different Checklists by PR Type
+
+Apply different checklists based on the type of PR:
+
+```yaml
+ruleset:
+  - name: "Feature PR Checklist"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^feat: .*"
+    validate:
+      - type: "
+include: "Feature Checklist"
+    on_failure:
+      - comment:
+          body: |
+            Please complete the Feature Checklist section in your PR description.
+
+            This should confirm:
+            - Feature requirements are met
+            - Tests are added
+            - Documentation is updated
+            - Feature is backwards compatible (if applicable)
+
+  - name: "Bug Fix Checklist"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "title"
+        match: "^fix: .*"
+    validate:
+      - type: "taskList"
+        include: "Bug Fix Checklist"
+    on_failure:
+      - comment:
+          body: |
+            Please complete the Bug Fix Checklist section in your PR description.
+
+            This should confirm:
+            - Root cause is identified
+            - Test case reproduces the issue
+            - Fix addresses the root cause
+            - Regression tests are added
+```
+
+### Security Checklist
+
+Enforce a security checklist for certain types of changes:
+
+```yaml
+ruleset:
+  - name: "Security Checklist"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    if:
+      - type: "files"
+        modified:
+          match: "src/(auth|security)/.*"
+    validate:
+      - type: "taskList"
+        include: "Security Considerations"
+    on_failure:
+      - label:
+          add: ["security-review-needed"]
+      - comment:
+          body: |
+            ## Security Checklist Required
+
+            Changes to security-related code require completing the Security Considerations checklist.
+
+            Please update your PR description to include this section with all items checked.
+```
+
+## Specialized PR Templates
+
+You can create specialized PR templates for different scenarios by using directories:
+
+1. Create a directory: `.github/PULL_REQUEST_TEMPLATE/`
+2. Add template files like:
+   - `feature.md` - Template for feature PRs
+   - `bugfix.md` - Template for bug fixes
+   - `security.md` - Template for security-related changes
+
+Contributors can then use the template that fits their PR:
+
+```
+https://github.com/username/repo/compare/main...branch?template=feature.md
+```
+
+## Best Practices
+
+<Check>Keep checklists focused and relevant</Check>
+<Check>Include the most important checks that are often forgotten</Check>
+<Check>Explain why each check is important</Check>
+<Check>Group related items in sensible categories</Check>
+
+<Warning>
+  Don't make checklists too long or contributors might check items without properly considering them
+</Warning>
+
+## Customizing Feedback
+
+Provide helpful guidance when tasks are incomplete:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        ## Incomplete PR Checklist
+
+        Your PR is missing some completed items from the checklist. 
+
+        Specifically:
+        {{ validation_summary }}
+
+        These checks help us maintain quality and consistency.
+        Please review each item carefully and check it off when completed.
+```

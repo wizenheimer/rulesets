@@ -1,0 +1,115 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Rulesets",
+  "logo": "/favicon.png",
+  "favicon": "/favicon.png",
+  "colors": {
+    "primary": "#7A90C7",
+    "light": "#A5B5DB",
+    "dark": "#5871B0",
+    "anchors": {
+      "from": "#7A90C7",
+      "to": "#5871B0"
+    }
+  },
+  "topbarCtaButton": {
+    "type": "github",
+    "url": "https://github.com/wizenheimer/rulesets"
+  },
+  "modeToggle": {
+    "default": "dark",
+    "isHidden": true
+  },
+  "anchors": [
+    {
+      "name": "Examples",
+      "icon": "code",
+      "url": "examples"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/wizenheimer/rulesets"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "installation",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "rules",
+        "events",
+        "conditions",
+        "validations",
+        "actions"
+      ]
+    },
+    {
+      "group": "Pull Request Validation",
+      "pages": [
+        "validators/title",
+        "validators/description",
+        "validators/commit",
+        "validators/branch",
+        "validators/size",
+        "validators/task-list",
+        "validators/approvals",
+        "validators/label",
+        "validators/age"
+      ]
+    },
+    {
+      "group": "Dependency Management",
+      "pages": [
+        "validators/dependent",
+        "filters/files"
+      ]
+    },
+    {
+      "group": "Team & Collaboration",
+      "pages": [
+        "filters/author",
+        "filters/team",
+        "actions/assign",
+        "actions/request-review"
+      ]
+    },
+    {
+      "group": "Repository Management",
+      "pages": [
+        "filters/repository",
+        "filters/branch",
+        "filters/milestone",
+        "actions/label",
+        "actions/merge",
+        "actions/close"
+      ]
+    },
+    {
+      "group": "Automation & Workflow",
+      "pages": [
+        "actions/comment",
+        "actions/checks"
+      ]
+    },
+    {
+      "group": "Examples & Use Cases",
+      "pages": [
+        "examples/conventional-commits",
+        "examples/branch-protection",
+        "examples/pr-size-limits",
+        "examples/auto-label"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/wizenheimer/rulesets"
+  }
+}

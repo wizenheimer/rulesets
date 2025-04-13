@@ -1,0 +1,157 @@
+---
+title: "Conditions"
+description: "Filter when rules are applied"
+---
+
+Conditions (the `if` property) determine whether a rule should be applied based on various criteria. They allow you to target specific pull requests based on authors, branches, files, labels, and more.
+
+## Condition Structure
+
+Conditions are defined in the `if` array of a rule:
+
+```yaml
+if:
+  - type: "condition_type"
+    # condition parameters
+  - type: "another_condition_type"
+    # condition parameters
+```
+
+All conditions must pass for the rule to be applied. Each condition has a `type` and type-specific parameters.
+
+## Available Condition Types
+
+<CardGroup cols={2}>
+  <Card title="Author" icon="user" href="/filters/author">
+    Filter based on the PR author
+  </Card>
+  <Card title="Branch" icon="code-branch" href="/filters/branch">
+    Filter based on branch names
+  </Card>
+  <Card title="Description" icon="file-lines" href="/filters/description">
+    Filter based on PR description content
+  </Card>
+  <Card title="Files" icon="file-code" href="/filters/files">
+    Filter based on changed files
+  </Card>
+  <Card title="Label" icon="tag" href="/filters/label">
+    Filter based on PR labels
+  </Card>
+  <Card title="Milestone" icon="flag" href="/filters/milestone">
+    Filter based on PR milestone
+  </Card>
+  <Card title="Repository" icon="database" href="/filters/repository">
+    Filter based on repository properties
+  </Card>
+  <Card title="Team" icon="users" href="/filters/team">
+    Filter based on team membership
+  </Card>
+</CardGroup>
+
+## Usage Examples
+
+### Filter by Author
+
+Only apply a rule to PRs from specific users:
+
+```yaml
+if:
+  - type: "author"
+    match: "username1" # Can also be an array: ["username1", "username2"]
+```
+
+### Filter by Branch
+
+Only apply a rule to PRs targeting a specific branch:
+
+```yaml
+if:
+  - type: "branch"
+    base:
+      match: "main"
+```
+
+### Filter by Files Changed
+
+Only apply a rule when specific files are modified:
+
+```yaml
+if:
+  - type: "files"
+    modified:
+      match: "src/backend/.+\\.js$"
+```
+
+### Filter by Label
+
+Only apply a rule to PRs with specific labels:
+
+```yaml
+if:
+  - type: "label"
+    match: "bug" # Can also be an array: ["bug", "critical"]
+```
+
+### Multiple Conditions
+
+All conditions must pass for the rule to be applied:
+
+```yaml
+if:
+  - type: "branch"
+    base:
+      match: "main"
+  - type: "label"
+    match: "security"
+  - type: "author"
+    ignore: "dependabot"
+```
+
+This rule will only apply to PRs:
+
+- Targeting the `main` branch, AND
+- Labeled with `security`, AND
+- Not created by `dependabot`
+
+## Pattern Matching
+
+Most conditions support pattern matching, which can be:
+
+- Exact match: `"main"`
+- Glob pattern: `"feat/*"`
+- Regular expression: `"/^feat\/.+$/"`
+
+<Note>
+  When using regular expressions, enclose the pattern in forward slashes (`/pattern/`).
+</Note>
+
+## Complete Example
+
+```yaml
+ruleset:
+  - name: "Frontend Code Review"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/frontend/.+\\.(js|ts|jsx|tsx)$"
+      - type: "branch"
+        base:
+          match: "main"
+      - type: "author"
+        ignore: "dependabot"
+    validate:
+      - type: "size"
+        files: 10
+    on_failure:
+      - comment:
+          body: "Frontend PRs should modify no more than 10 files"
+```
+
+This rule only applies to PRs that:
+
+- Modify frontend JavaScript/TypeScript files
+- Target the `main` branch
+- Are not created by Dependabot

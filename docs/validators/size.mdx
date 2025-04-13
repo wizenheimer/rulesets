@@ -1,0 +1,265 @@
+---
+title: "Size Validator"
+description: "Validate PR size (files, additions, deletions)"
+---
+
+The Size Validator ensures that pull requests don't exceed specified size limits. This helps maintain manageable PRs that are easier to review and less likely to introduce bugs.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"size"`
+</ParamField>
+
+<ParamField path="files" type="number">
+  Maximum number of files that can be changed
+</ParamField>
+
+<ParamField path="total" type="number">
+  Maximum total number of lines changed (additions + deletions)
+</ParamField>
+
+<ParamField path="addition" type="number">
+  Maximum number of line additions
+</ParamField>
+
+<ParamField path="deletion" type="number">
+  Maximum number of line deletions
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  File patterns to ignore when calculating size
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "size"
+    files: 10
+    total: 500
+    message: "This PR is too large. Please split it into smaller PRs."
+```
+
+## Examples
+
+### Simple Size Limit
+
+Limit the number of files changed:
+
+```yaml
+validate:
+  - type: "size"
+    files: 10
+    message: "PRs should modify no more than 10 files"
+```
+
+### Detailed Size Constraints
+
+Set limits for files, additions, and deletions:
+
+```yaml
+validate:
+  - type: "size"
+    files: 15
+    addition: 500
+    deletion: 200
+    message: "PR exceeds size limits. Keep PRs focused and manageable."
+```
+
+### Ignore Certain Files
+
+Exclude certain files from size calculations:
+
+```yaml
+validate:
+  - type: "size"
+    files: 10
+    total: 500
+    ignore:
+      - "package-lock.json"
+      - "yarn.lock"
+      - "*.generated.ts"
+    message: "PR is too large (excluding dependency lock files and generated code)"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Calculate Size">
+    The validator calculates the PR size metrics:
+    - Number of files changed
+    - Lines added
+    - Lines deleted
+    - Total changes (additions + deletions)
+  </Step>
+  <Step title="Apply Filters">
+    If `ignore` patterns are specified, files matching these patterns are excluded from calculations
+  </Step>
+  <Step title="Check Limits">
+    Checks if any of the specified limits are exceeded
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Different Size Limits by Branch
+
+Apply stricter size limits for production branches:
+
+```yaml
+ruleset:
+  - name: "Size Limits - Production"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "size"
+        files: 10
+        total: 300
+    on_failure:
+      - comment:
+          body: "PRs to main branch must be small and focused (max 10 files, 300 lines)"
+
+  - name: "Size Limits - Development"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "size"
+        files: 20
+        total: 500
+    on_failure:
+      - comment:
+          body: "PRs to develop branch should be reasonably sized (max 20 files, 500 lines)"
+```
+
+### Different Limits by PR Type
+
+Different size expectations based on PR type:
+
+```yaml
+ruleset:
+  - name: "Feature PR Size"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "title"
+        match: "^feat: .*"
+    validate:
+      - type: "size"
+        files: 15
+        total: 500
+    on_failure:
+      - label:
+          add: ["large-feature"]
+
+  - name: "Bug Fix PR Size"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "title"
+        match: "^fix: .*"
+    validate:
+      - type: "size"
+        files: 5
+        total: 200
+    on_failure:
+      - label:
+          add: ["large-bugfix"]
+```
+
+### Auto-Label by Size
+
+Label PRs based on their size:
+
+```yaml
+ruleset:
+  - name: "PR Size Labeling"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    on_success:
+      - label:
+          remove: ["size: small", "size: medium", "size: large"]
+
+  - name: "Small PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          max: 5
+        total:
+          max: 100
+    on_success:
+      - label:
+          add: ["size: small"]
+
+  - name: "Medium PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 6
+          max: 15
+        total:
+          min: 101
+          max: 500
+    on_success:
+      - label:
+          add: ["size: medium"]
+
+  - name: "Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 16
+        total:
+          min: 501
+    on_success:
+      - label:
+          add: ["size: large"]
+```
+
+## Best Practices
+
+<Check>Set reasonable size limits based on your project's needs</Check>
+<Check>Consider ignoring files that change often or are auto-generated</Check>
+<Check>Provide constructive feedback for large PRs</Check>
+<Check>Define different limits for different types of changes</Check>
+
+<Warning>
+  Be flexible - some changes legitimately require larger PRs, such as major refactoring
+</Warning>
+
+## Benefits of Limiting PR Size
+
+- **Easier Review**: Smaller PRs are easier and faster to review
+- **Higher Quality**: Issues are less likely to be missed in smaller changes
+- **Faster Feedback**: Contributors get feedback sooner on smaller changes
+- **Lower Risk**: Smaller changes have lower risk of introducing bugs
+- **Better History**: More granular commit history is easier to understand and bisect

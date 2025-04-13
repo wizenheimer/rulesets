@@ -1,0 +1,143 @@
+---
+title: "Conventional Commits"
+description: "Enforce Conventional Commits format in your PRs"
+---
+
+This example shows how to enforce the [Conventional Commits](https://www.conventionalcommits.org/) format in your pull requests, ensuring a consistent and meaningful commit history.
+
+## Complete Configuration
+
+````yaml
+ruleset:
+  - name: "Conventional Commit Format"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.synchronize"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+        message: "PR title must follow conventional commit format: type(scope): description"
+      - type: "commit"
+        match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+        message: "All commits must follow conventional commit format"
+        ignore_merge_commits: true
+    on_success:
+      - label:
+          add: ["conventional-format"]
+    on_failure:
+      - comment:
+          body: |
+            ## Invalid Commit Format
+
+            Please format your title and commits according to the Conventional Commits specification:
+
+            ```
+            <type>(<optional scope>): <description>
+
+            [optional body]
+
+            [optional footer(s)]
+            ```
+
+            Where `type` is one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+            Example: `feat(user): add login functionality`
+
+            {{ validation_summary }}
+````
+
+## How It Works
+
+This ruleset:
+
+1. Triggers when a PR is opened, edited, or synchronized
+2. Validates that the PR title follows the Conventional Commits format
+3. Validates that all commit messages follow the Conventional Commits format (ignoring merge commits)
+4. Adds a "conventional-format" label when validations pass
+5. Comments with guidance when validations fail
+
+## Key Components
+
+### Title Validation
+
+The title validator ensures the PR title follows the format `type(scope): description`:
+
+```yaml
+validate:
+  - type: "title"
+    match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+```
+
+### Commit Validation
+
+The commit validator ensures all commit messages follow the same format:
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+    ignore_merge_commits: true
+```
+
+Setting `ignore_merge_commits: true` prevents validation failures on automatically generated merge commits.
+
+### Feedback Mechanism
+
+When validations fail, a detailed comment is added to guide contributors:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        ## Invalid Commit Format
+
+        Please format your title and commits according to the Conventional Commits specification:
+
+        # ... detailed explanation and example ...
+```
+
+## Customization Options
+
+You can customize this ruleset in several ways:
+
+### Modified Type List
+
+If you want to use a different set of types:
+
+```yaml
+match: "^(feature|bugfix|documentation|refactor|performance|test): .+"
+```
+
+### Require Scope
+
+If you want to make the scope mandatory:
+
+```yaml
+match: "^(feat|fix|docs)(\\([a-z0-9-]+\\)): .+"
+```
+
+### First Commit Only
+
+For workflows that squash commits, validate only the first commit:
+
+```yaml
+validate:
+  - type: "commit"
+    match: "^(feat|fix|docs).*"
+    first_only: true
+```
+
+## Implementation Tips
+
+1. **Provide Templates**: Create PR templates that include the conventional format
+2. **Setup Git Hooks**: Use tools like [commitlint](https://commitlint.js.org/) locally
+3. **Educate Contributors**: Link to the Conventional Commits documentation in your README
+4. **Start Simple**: Begin with basic validation and gradually add complexity
+
+## Benefits
+
+- **Automated Changelogs**: Tools can parse conventional commits to generate changelogs
+- **Clear Intent**: The commit type instantly communicates the purpose of a change
+- **Semantic Versioning**: Types like "feat" and "fix" can trigger appropriate version bumps
+- **Better History**: Makes your repository history more meaningful and navigable

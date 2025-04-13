@@ -1,0 +1,134 @@
+---
+title: "Events"
+description: "GitHub events that trigger rules"
+---
+
+Events are GitHub webhook events that trigger rule evaluation in Rulesets. The `when` property of a rule defines which events will cause the rule to be processed.
+
+## Event Format
+
+GitHub events follow the format `event_name.action`. For example:
+
+- `pull_request.opened` - Triggered when a pull request is opened
+- `pull_request_review.submitted` - Triggered when a review is submitted
+
+## Supported Events
+
+<Tabs>
+  <Tab title="Pull Request Events">
+    | Event | Description |
+    |-------|-------------|
+    | `pull_request.opened` | When a new pull request is created |
+    | `pull_request.edited` | When a pull request's title or body is edited |
+    | `pull_request.reopened` | When a closed pull request is reopened |
+    | `pull_request.synchronize` | When new commits are pushed to the PR branch |
+    | `pull_request.labeled` | When a label is added to a pull request |
+    | `pull_request.unlabeled` | When a label is removed from a pull request |
+    | `pull_request.ready_for_review` | When a draft PR is marked as ready for review |
+    | `pull_request.converted_to_draft` | When a PR is converted to draft |
+    | `pull_request.assigned` | When a user is assigned to a pull request |
+    | `pull_request.unassigned` | When a user is unassigned from a pull request |
+    | `pull_request.milestoned` | When a milestone is added to a pull request |
+    | `pull_request.demilestoned` | When a milestone is removed from a pull request |
+  </Tab>
+  <Tab title="Review Events">
+    | Event | Description |
+    |-------|-------------|
+    | `pull_request_review.submitted` | When a review is submitted |
+    | `pull_request_review.edited` | When a review is edited |
+    | `pull_request_review.dismissed` | When a review is dismissed |
+    
+    | Event | Description |
+    |-------|-------------|
+    | `pull_request_review_comment.created` | When a review comment is created |
+    | `pull_request_review_comment.edited` | When a review comment is edited |
+  </Tab>
+</Tabs>
+
+## Using Wildcards
+
+You can use wildcards to match multiple actions for an event:
+
+```yaml
+when:
+  - "pull_request.*" # Matches any pull request action
+```
+
+This will trigger the rule for any pull request event, such as opened, edited, synchronized, etc.
+
+## Multiple Event Types
+
+You can specify multiple event types to trigger a rule:
+
+```yaml
+when:
+  - "pull_request.opened"
+  - "pull_request.edited"
+  - "pull_request.synchronize"
+```
+
+## Best Practices
+
+<Check>Be specific - only trigger rules on the events they need to run for</Check>
+<Check>Group related events when a rule should run in similar situations</Check>
+<Check>Consider performance by avoiding unnecessary triggers</Check>
+
+<Warning>
+  Use wildcards (e.g., `pull_request.*`) carefully as they may trigger rules more frequently than expected
+</Warning>
+
+## Examples
+
+### Basic Event Trigger
+
+```yaml
+ruleset:
+  - name: "Title Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "title"
+        match: "^(feat|fix): .+"
+```
+
+### Comprehensive PR Lifecycle
+
+```yaml
+ruleset:
+  - name: "PR Size Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "size"
+        files: 10
+
+  - name: "Required Approvals"
+    when:
+      - "pull_request_review.submitted"
+      - "pull_request_review.dismissed"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+
+  - name: "Final Checklist"
+    when:
+      - "pull_request.ready_for_review"
+    validate:
+      - type: "taskList"
+        include: ["Checklist"]
+```
+
+## Event Context
+
+Each event provides different context data that can be used in validations and actions. The most common context data includes:
+
+- Pull request details (title, body, number, state)
+- Repository information (name, owner)
+- User information (login, name)
+- Labels, assignees, milestones
+- Changed files (for certain events)
+
+This context data is available for use in templates and for validators to check against.

@@ -1,0 +1,257 @@
+---
+title: "Age Validator"
+description: "Validate PR age (time since creation or update)"
+---
+
+The Age Validator checks the age of a pull request - how much time has passed since it was created or last updated. This helps identify stale PRs that need attention and enforce timely reviews and updates.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"age"`
+</ParamField>
+
+<ParamField path="created" type="object">
+  Constraints for the time since PR creation
+</ParamField>
+
+<ParamField path="created.min" type="number">
+  Minimum age in days since creation
+</ParamField>
+
+<ParamField path="created.max" type="number">
+  Maximum age in days since creation
+</ParamField>
+
+<ParamField path="created.message" type="string">
+  Custom message for created age constraint failures
+</ParamField>
+
+<ParamField path="updated" type="object">
+  Constraints for the time since PR was last updated
+</ParamField>
+
+<ParamField path="updated.min" type="number">
+  Minimum age in days since last update
+</ParamField>
+
+<ParamField path="updated.max" type="number">
+  Maximum age in days since last update
+</ParamField>
+
+<ParamField path="updated.message" type="string">
+  Custom message for updated age constraint failures
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "age"
+    updated:
+      max: 14
+      message: "This PR hasn't been updated in over 2 weeks"
+```
+
+## Examples
+
+### Identify Stale PRs
+
+Detect PRs that haven't been updated in a while:
+
+```yaml
+validate:
+  - type: "age"
+    updated:
+      max: 14
+      message: "This PR hasn't been updated in over 2 weeks"
+```
+
+### Enforce Update Cooldown
+
+Ensure PRs have had time to be reviewed before merging:
+
+```yaml
+validate:
+  - type: "age"
+    created:
+      min: 1
+      message: "PRs must be open for at least 24 hours to allow for review"
+```
+
+### Expiry Policy
+
+Implement an expiry policy for old PRs:
+
+```yaml
+validate:
+  - type: "age"
+    created:
+      max: 30
+      message: "This PR is over 30 days old and should be closed or updated"
+```
+
+### Combined Age Constraints
+
+Apply multiple age-related constraints:
+
+```yaml
+validate:
+  - type: "age"
+    created:
+      max: 30
+      message: "This PR is over 30 days old"
+    updated:
+      max: 14
+      message: "This PR hasn't been updated in over 2 weeks"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Timestamps">
+    The validator retrieves the PR's created and updated timestamps
+  </Step>
+  <Step title="Calculate Ages">
+    It calculates the age in days since creation and last update
+  </Step>
+  <Step title="Check Created Age">
+    If `created` constraints are specified, it checks if the age since creation is within limits
+  </Step>
+  <Step title="Check Updated Age">
+    If `updated` constraints are specified, it checks if the age since last update is within limits
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Practical Use Cases
+
+### Stale PR Detection
+
+Automatically label and notify about stale PRs:
+
+```yaml
+ruleset:
+  - name: "PR Age Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "schedule.daily" # This would require additional configuration
+    validate:
+      - type: "age"
+        updated:
+          max: 14
+          message: "This PR hasn't been updated in over 2 weeks"
+    on_failure:
+      - label:
+          add: ["stale"]
+      - comment:
+          body: |
+            ## Stale Pull Request
+
+            This PR hasn't been updated in over 2 weeks. Please update it or consider closing it.
+
+            If you're still working on this PR, please add a comment or push new changes.
+```
+
+### PR Lifecycle Management
+
+Implement a complete PR lifecycle management system:
+
+```yaml
+ruleset:
+  - name: "Recent PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "age"
+        updated:
+          max: 7
+    on_success:
+      - label:
+          add: ["active"]
+          remove: ["stale", "abandoned"]
+
+  - name: "Stale PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "schedule.daily" # This would require additional configuration
+    validate:
+      - type: "age"
+        updated:
+          min: 7
+          max: 14
+    on_success:
+      - label:
+          add: ["stale"]
+          remove: ["active", "abandoned"]
+      - comment:
+          body: |
+            This PR hasn't been updated in over a week. 
+            Are you still working on it or do you need help?
+
+  - name: "Abandoned PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "schedule.daily" # This would require additional configuration
+    validate:
+      - type: "age"
+        updated:
+          min: 30
+    on_success:
+      - label:
+          add: ["abandoned"]
+          remove: ["active", "stale"]
+      - comment:
+          body: |
+            This PR has been inactive for 30 days and is now considered abandoned.
+            It will be closed in 7 days unless updated.
+```
+
+### Code Review Aging
+
+Track how long PRs have been waiting for review:
+
+```yaml
+ruleset:
+  - name: "Needs Review Reminder"
+    when:
+      - "pull_request.labeled"
+      - "schedule.daily" # This would require additional configuration
+    if:
+      - type: "label"
+        match: "needs-review"
+    validate:
+      - type: "age"
+        updated:
+          max: 2
+    on_failure:
+      - comment:
+          body: |
+            This PR has been waiting for review for over 2 days.
+            @maintainers please review when you have a chance.
+```
+
+## Best Practices
+
+<Check>Set reasonable timeframes based on your team's workflow</Check>
+<Check>Use age validation as part of a comprehensive PR management strategy</Check>
+<Check>Combine with labels to visualize PR status</Check>
+<Check>Provide helpful guidance in comments for stale PRs</Check>
+
+<Warning>
+  Be mindful of vacation periods and other factors that might legitimately delay PR updates
+</Warning>
+
+## Benefits of Age Validation
+
+- **Reduced Staleness**: Prevents PRs from languishing without attention
+- **Faster Cycle Time**: Encourages timely reviews and updates
+- **Better Communication**: Prompts discussions about delayed PRs
+- **Cleaner PR Queue**: Helps identify PRs that should be closed
+- **Workflow Visibility**: Makes PR aging explicit and trackable

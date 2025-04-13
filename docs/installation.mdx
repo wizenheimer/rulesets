@@ -1,0 +1,108 @@
+---
+title: "Installation"
+description: "How to install and configure Rulesets"
+---
+
+Getting started with Rulesets is straightforward and can be done in a few simple steps.
+
+## GitHub App Installation
+
+The easiest way to use Rulesets is through the GitHub Marketplace:
+
+<Steps>
+  <Step title="Visit GitHub Marketplace">
+    Go to the [Rulesets GitHub App](https://github.com/marketplace/rulesets) in the GitHub Marketplace
+  </Step>
+  <Step title="Install the App">
+    Click "Install it for free"
+  </Step>
+  <Step title="Choose Repository Access">
+    Select which repositories Rulesets should have access to:
+    - All repositories
+    - Only select repositories
+  </Step>
+  <Step title="Confirm Installation">
+    Review the permissions and confirm the installation
+  </Step>
+</Steps>
+
+## Configuration Setup
+
+After installing the GitHub App, you need to create a configuration file in your repository:
+
+<Steps>
+  <Step title="Create Configuration File">
+    Create a new file at `.github/Ruleset.yml` in your repository
+  </Step>
+  <Step title="Define Your Ruleset">
+    Add your ruleset configuration (see [Quickstart](/quickstart) for examples)
+  </Step>
+  <Step title="Commit and Push">
+    Commit the configuration file and push it to your repository
+  </Step>
+</Steps>
+
+## Self-Hosting (Optional)
+
+If you prefer to self-host Rulesets:
+
+```bash
+# Clone the repository
+git clone https://github.com/wizenheimer/rulesets.git
+cd rulesets
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your GitHub App credentials
+
+# Build and start the server
+npm run build
+npm start
+```
+
+## Required Permissions
+
+Rulesets requires the following GitHub permissions:
+
+| Permission    | Access Level | Purpose                    |
+| ------------- | ------------ | -------------------------- |
+| Checks        | Read & Write | Create check runs          |
+| Contents      | Read & Write | Access repository files    |
+| Issues        | Read & Write | Add comments and labels    |
+| Pull Requests | Read & Write | Manage pull requests       |
+| Metadata      | Read         | Access repository metadata |
+| Statuses      | Read & Write | Update commit statuses     |
+| Members       | Read         | Check team membership      |
+
+## Verification
+
+To verify your installation is working correctly:
+
+1. Create a test pull request
+2. Check if Rulesets is applying your rules as expected
+3. Review any comments or actions performed by the app
+
+## Troubleshooting
+
+If you encounter issues:
+
+<AccordionGroup>
+  <Accordion title="Configuration Not Working">
+    - Ensure your `.github/Ruleset.yml` file is valid YAML
+    - Check that the indentation is correct
+    - Verify the file is in the correct location
+  </Accordion>
+  <Accordion title="Missing Permissions">
+    - Confirm the GitHub App has all required permissions
+    - Re-install the app if needed to grant missing permissions
+  </Accordion>
+  <Accordion title="Events Not Triggering">
+    - Check that you've subscribed to the right events in your rules
+    - Verify that the GitHub App is receiving webhooks
+  </Accordion>
+</AccordionGroup>
+
+For more help, check the [GitHub Issues](https://github.com/wizenheimer/rulesets/issues) or submit a new issue.

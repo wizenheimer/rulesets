@@ -1,0 +1,290 @@
+---
+title: "Branch Protection Example"
+description: "Enforce branch naming conventions and protect important branches"
+---
+
+This example shows how to enforce branch naming conventions and implement protections for important branches using Rulesets.
+
+## Configuration
+
+```yaml
+ruleset:
+  # Branch Naming Convention
+  - name: "Branch Naming Convention"
+    when:
+      - "pull_request.opened"
+    validate:
+      - type: "branch"
+        head:
+          match: "^(feature|bugfix|hotfix|release)/[a-z0-9-_]+"
+          message: "Branch name must follow pattern: type/description (e.g., feature/add-login)"
+    on_failure:
+      - comment:
+          body: |
+            Your branch name doesn't follow our naming convention.
+            Please use one of these prefixes followed by a descriptive name:
+            - feature/
+            - bugfix/
+            - hotfix/
+            - release/
+
+            Examples: `feature/user-authentication`, `bugfix/login-error`
+
+            {{ validation_summary }}
+
+  # Protected Main Branch
+  - name: "Main Branch Protection"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+      - "pull_request_review.submitted"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "size"
+        files: 10
+        total: 300
+      - type: "approvals"
+        count:
+          min: 2
+        require_code_owners: true
+    on_failure:
+      - label:
+          add: ["needs-work"]
+      - comment:
+          body: |
+            ## Main Branch Protection
+
+            PRs to the main branch have stricter requirements:
+
+            - Limited size (max 10 files, 300 lines total)
+            - At least 2 approvals including code owners
+
+            {{ validation_summary }}
+
+  # Feature to Develop Only
+  - name: "Feature Branch Flow"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "branch"
+        head:
+          match: "^feature/.*"
+        base:
+          match: "main"
+    validate:
+      - type: "branch"
+        base:
+          match: "develop"
+          message: "Feature branches must target develop, not main"
+    on_failure:
+      - comment:
+          body: |
+            ## Incorrect Branch Target
+
+            Feature branches should be merged into `develop` first, not directly to `main`.
+
+            Please close this PR and create a new one targeting the `develop` branch.
+```
+
+## How It Works
+
+This ruleset implements three important branch protection patterns:
+
+1. **Branch Naming Convention**: Ensures all feature branches follow a consistent naming pattern
+2. **Main Branch Protection**: Applies stricter validation for PRs targeting the main branch
+3. **Feature Branch Flow**: Enforces a workflow where feature branches must target develop, not main
+
+## Extending the Example
+
+### Branch Prefixes by Type
+
+Enforce different branch prefixes based on the type of change:
+
+```yaml
+ruleset:
+  - name: "Feature Branch Names"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "title"
+        match: "^feat: .*"
+    validate:
+      - type: "branch"
+        head:
+          match: "^feature/.*"
+    on_failure:
+      - comment:
+          body: "Feature PRs should come from branches starting with 'feature/'"
+
+  - name: "Bugfix Branch Names"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "title"
+        match: "^fix: .*"
+    validate:
+      - type: "branch"
+        head:
+          match: "^(bugfix|hotfix)/.*"
+    on_failure:
+      - comment:
+          body: "Bug fix PRs should come from branches starting with 'bugfix/' or 'hotfix/'"
+```
+
+### Jira Integration
+
+Enforce Jira ticket references in branch names:
+
+```yaml
+validate:
+  - type: "branch"
+    head:
+      match: "^(feature|bugfix|hotfix)/[A-Z]+-[0-9]+-[a-z0-9-]+"
+      message: "Branch name must include Jira issue ID (e.g., feature/PROJ-123-description)"
+```
+
+### Team-Specific Branches
+
+Apply different naming conventions for different teams:
+
+```yaml
+ruleset:
+  - name: "Frontend Team Branches"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "org/frontend-team"
+    validate:
+      - type: "branch"
+        head:
+          match: "^frontend/.*"
+    on_failure:
+      - comment:
+          body: "Frontend team branches should start with 'frontend/'"
+
+  - name: "Backend Team Branches"
+    when:
+      - "pull_request.opened"
+    if:
+      - type: "team"
+        match: "org/backend-team"
+    validate:
+      - type: "branch"
+        head:
+          match: "^backend/.*"
+    on_failure:
+      - comment:
+          body: "Backend team branches should start with 'backend/'"
+```
+
+### Release Branch Restrictions
+
+Enforce special rules for release branches:
+
+```yaml
+ruleset:
+  - name: "Release Branch Protection"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        head:
+          match: "^release/.*"
+    validate:
+      - type: "approvals"
+        count:
+          min: 3
+        include: ["release-manager"]
+      - type: "label"
+        include: ["release-approved"]
+    on_failure:
+      - comment:
+          body: |
+            ## Release Branch Requirements
+
+            Release branches have special requirements:
+            - 3+ approvals including the release manager
+            - Must have 'release-approved' label
+
+            {{ validation_summary }}
+```
+
+## Branch Protection Strategy
+
+Implement a complete branch protection strategy with these components:
+
+### GitHub Branch Protection Settings
+
+First, set up GitHub branch protection rules for important branches:
+
+1. Go to Repository Settings → Branches → Branch protection rules
+2. Add rules for `main` and `develop` branches:
+   - Require pull request reviews
+   - Require status checks to pass
+   - Restrict who can push
+
+### Complementary Ruleset Configuration
+
+Then use Rulesets to add more sophisticated validations:
+
+```yaml
+ruleset:
+  - name: "Develop Branch PRs"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "size"
+        files: 20
+        total: 500
+      - type: "approvals"
+        count:
+          min: 1
+    on_success:
+      - label:
+          add: ["ready-to-merge"]
+    on_failure:
+      - label:
+          add: ["needs-work"]
+
+  - name: "Main Branch PRs"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "branch"
+        head:
+          match: ["develop", "hotfix/.*", "release/.*"]
+          message: "Only develop, hotfix, or release branches can target main"
+      - type: "approvals"
+        count:
+          min: 2
+        require_code_owners: true
+    on_success:
+      - label:
+          add: ["production-ready"]
+    on_failure:
+      - label:
+          add: ["needs-review"]
+```
+
+## Benefits
+
+- **Consistency**: Enforces consistent branch naming across the team
+- **Quality Control**: Applies appropriate validation based on branch type and target
+- **Workflow Enforcement**: Ensures your Git workflow is followed correctly
+- **Automated Feedback**: Provides clear guidance when conventions aren't followed
+- **Reduced Human Error**: Prevents accidental merges to protected branches

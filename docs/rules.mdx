@@ -1,0 +1,168 @@
+---
+title: 'Rules'
+description: 'Understanding rule structure and behavior'
+---
+
+Rules are the core building blocks of Rulesets. Each ruleset consists of one or more rules that define how to validate pull requests and what actions to take based on validation results.
+
+## Rule Structure
+
+A rule consists of the following components:
+
+```yaml
+ruleset:
+  - name: "Rule Name"
+    when:
+      - "event1"
+      - "event2"
+    if:
+      - type: "condition1"
+        # condition parameters
+      - type: "condition2"
+        # condition parameters
+    validate:
+      - type: "validation1"
+        # validation parameters
+      - type: "validation2"
+        # validation parameters
+    on_success:
+      - action1:
+          # action parameters
+      - action2:
+          # action parameters
+    on_failure:
+      - action3:
+          # action parameters
+      - action4:
+          # action parameters
+```
+
+## Components
+
+<ParamField path="name" type="string" required>
+  A descriptive name for the rule
+</ParamField>
+
+<ParamField path="when" type="array" required>
+  GitHub events that trigger this rule (e.g., "pull_request.opened")
+</ParamField>
+
+<ParamField path="if" type="array">
+  Conditions that determine if the rule should be applied
+</ParamField>
+
+<ParamField path="validate" type="array">
+  Validations to run on the pull request
+</ParamField>
+
+<ParamField path="on_success" type="array">
+  Actions to perform when all validations pass
+</ParamField>
+
+<ParamField path="on_failure" type="array">
+  Actions to perform when any validation fails
+</ParamField>
+
+## Execution Flow
+
+<Frame>
+  <img src="/images/rule-flow.png" alt="Rule Execution Flow" />
+</Frame>
+
+1. **Event Matching**: When a GitHub event occurs, Rulesets checks if it matches any rules' `when` criteria
+2. **Condition Evaluation**: For matching rules, it evaluates the `if` conditions (if any)
+3. **Validation**: If conditions pass, it runs the `validate` checks
+4. **Action Execution**: Based on validation results, it executes either `on_success` or `on_failure` actions
+
+## Behavior Details
+
+- All conditions in `if` must pass for a rule to be applied
+- All validations in `validate` must pass for a rule to be considered successful
+- If there are no validations, the rule is always considered successful
+- Rules are processed in the order they appear in the configuration
+- Multiple rules can be triggered by the same event
+
+## Best Practices
+
+<Check>Use descriptive names for your rules</Check>
+<Check>Create focused rules that address specific aspects of PR validation</Check>
+<Check>Place important rules first, especially those that might block progress</Check>
+<Check>Provide meaningful feedback in comments</Check>
+<Check>Use template variables to customize messages</Check>
+
+<Warning>
+  Be careful when multiple rules validate the same aspects of a PR, as this could lead to confusing feedback
+</Warning>
+
+## Examples
+
+### Simple Title Validation
+
+```yaml
+ruleset:
+  - name: "Title Format Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs): .+"
+    on_failure:
+      - comment:
+          body: "PR title should start with 'feat:', 'fix:', or 'docs:'"
+```
+
+### Conditional Rule
+
+```yaml
+ruleset:
+  - name: "Backend Tests Required"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "files"
+        modified:
+          match: "src/backend/.+\\.js$"
+    validate:
+      - type: "files"
+        modified:
+          match: "tests/backend/.+\\.test.js$"
+    on_failure:
+      - comment:
+          body: "Backend changes require corresponding test files"
+```
+
+### Complex Rule
+
+```yaml
+ruleset:
+  - name: "Production Code Review"
+    when:
+      - "pull_request.opened"
+      - "pull_request.ready_for_review"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+      - type: "label"
+        match: "production"
+    validate:
+      - type: "size"
+        files: 20
+      - type: "approvals"
+        count:
+          min: 2
+        require_code_owners: true
+    on_success:
+      - label:
+          add: ["ready-for-merge"]
+    on_failure:
+      - comment:
+          body: |
+            This PR targets the production branch and requires:
+            - No more than 20 files changed
+            - At least 2 approvals including code owners
+            
+            {{ validation_summary }}
+```

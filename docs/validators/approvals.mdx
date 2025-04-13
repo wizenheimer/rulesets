@@ -1,0 +1,282 @@
+---
+title: "Approvals Validator"
+description: "Validate pull request approval requirements"
+---
+
+The Approvals Validator ensures that pull requests have received the required number and type of approvals before they can be merged. This helps maintain code quality by enforcing sufficient peer review.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"approvals"`
+</ParamField>
+
+<ParamField path="count" type="object">
+  Requirements for the number of approvals
+</ParamField>
+
+<ParamField path="count.min" type="number">
+  Minimum number of approvals required
+</ParamField>
+
+<ParamField path="count.max" type="number">
+  Maximum number of approvals allowed
+</ParamField>
+
+<ParamField path="include" type="string | string[]">
+  Specific users who must approve the PR
+</ParamField>
+
+<ParamField path="require_code_owners" type="boolean">
+  Whether code owners must approve changes to their files
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "approvals"
+    count:
+      min: 2
+    message: "PRs require at least 2 approvals before merging"
+```
+
+## Examples
+
+### Minimum Approvals
+
+Require a minimum number of approvals:
+
+```yaml
+validate:
+  - type: "approvals"
+    count:
+      min: 2
+    message: "PRs require at least 2 approvals before merging"
+```
+
+### Required Approvers
+
+Require approval from specific users:
+
+```yaml
+validate:
+  - type: "approvals"
+    include: ["tech-lead", "security-reviewer"]
+    message: "PRs require approval from both the tech lead and security reviewer"
+```
+
+### Code Owners Approval
+
+Require approval from code owners:
+
+```yaml
+validate:
+  - type: "approvals"
+    require_code_owners: true
+    message: "PRs require approval from code owners of modified files"
+```
+
+### Combined Requirements
+
+Combine multiple approval requirements:
+
+```yaml
+validate:
+  - type: "approvals"
+    count:
+      min: 2
+    include: ["tech-lead"]
+    require_code_owners: true
+    message: "PRs require at least 2 approvals including the tech lead and code owners"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Reviews">
+    The validator retrieves all reviews for the PR
+  </Step>
+  <Step title="Filter Approvals">
+    It filters to find the latest review from each user, keeping only approvals
+  </Step>
+  <Step title="Check Count">
+    If `count` is specified, it verifies the number of approvals meets requirements
+  </Step>
+  <Step title="Check Required Approvers">
+    If `include` is specified, it checks if all required users have approved
+  </Step>
+  <Step title="Check Code Owners">
+    If `require_code_owners` is true, it checks if code owners have approved changes to their files
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Code Owners Integration
+
+The validator can check for approval from code owners as defined in a CODEOWNERS file. To use this feature:
+
+1. Create a file at `.github/CODEOWNERS` in your repository
+2. Define ownership patterns, for example:
+
+   ```
+   # Frontend code
+   /src/frontend/ @frontend-team
+
+   # Backend code
+   /src/backend/ @backend-team
+
+   # Security-sensitive files
+   *.auth.js @security-team
+   ```
+
+3. Enable the `require_code_owners` option in your validation rule
+
+## Practical Use Cases
+
+### Basic Approval Workflow
+
+Implement a simple approval workflow:
+
+```yaml
+ruleset:
+  - name: "Required Approvals"
+    when:
+      - "pull_request_review.submitted"
+      - "pull_request_review.dismissed"
+    validate:
+      - type: "approvals"
+        count:
+          min: 2
+    on_success:
+      - label:
+          add: ["approved"]
+          remove: ["needs-review"]
+    on_failure:
+      - label:
+          add: ["needs-review"]
+          remove: ["approved"]
+```
+
+### Different Requirements by Branch
+
+Apply stricter requirements for important branches:
+
+```yaml
+ruleset:
+  - name: "Main Branch Approvals"
+    when:
+      - "pull_request_review.submitted"
+      - "pull_request_review.dismissed"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "approvals"
+        count:
+          min: 3
+        include: ["tech-lead"]
+        require_code_owners: true
+    on_failure:
+      - comment:
+          body: |
+            ## Additional Approvals Needed
+
+            PRs to main branch require:
+            - At least 3 approvals
+            - Approval from a tech lead
+            - Approval from code owners
+
+            {{ validation_summary }}
+
+  - name: "Develop Branch Approvals"
+    when:
+      - "pull_request_review.submitted"
+      - "pull_request_review.dismissed"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_failure:
+      - comment:
+          body: "PRs to develop branch require at least 1 approval"
+```
+
+### Security Review for Sensitive Changes
+
+Require security team approval for security-related changes:
+
+```yaml
+ruleset:
+  - name: "Security Approval"
+    when:
+      - "pull_request_review.submitted"
+      - "pull_request_review.dismissed"
+    if:
+      - type: "files"
+        modified:
+          match: "src/(auth|security)/.*"
+    validate:
+      - type: "approvals"
+        include: ["security-team-lead"]
+    on_failure:
+      - label:
+          add: ["security-review-needed"]
+      - comment:
+          body: "Changes to security-related code require approval from the security team lead"
+```
+
+### Auto-Merge When Approved
+
+Automatically merge PRs when they receive sufficient approvals:
+
+```yaml
+ruleset:
+  - name: "Auto-Merge Documentation"
+    when:
+      - "pull_request_review.submitted"
+    if:
+      - type: "files"
+        modified:
+          match: "docs/.*"
+      - type: "label"
+        match: "documentation"
+    validate:
+      - type: "approvals"
+        count:
+          min: 1
+    on_success:
+      - merge:
+          method: "squash"
+          commit_title: "docs: {{ pull_request.title }}"
+```
+
+## Best Practices
+
+<Check>Set approval requirements appropriate to your team size</Check>
+<Check>Use code owners for specialized areas of your codebase</Check>
+<Check>Consider different requirements for different branches</Check>
+<Check>Provide clear feedback about what approvals are still needed</Check>
+
+<Warning>
+  Be mindful of approval requirements for teams with limited resources
+</Warning>
+
+## Benefits of Approval Validation
+
+- **Enforced Code Review**: Ensures code is properly reviewed before merging
+- **Knowledge Sharing**: Encourages knowledge sharing across the team
+- **Quality Control**: Maintains code quality through peer review
+- **Compliance**: Helps meet regulatory or organizational requirements for code review
+- **Specialized Review**: Ensures appropriate experts review relevant changes

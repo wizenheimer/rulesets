@@ -1,71 +1,69 @@
 ---
-title: Introduction
-description: "Welcome to the home of your new documentation"
+title: "Introduction"
+description: "Review the Code, Not the Checklist"
 ---
 
-<img
-  className="block dark:hidden"
-  src="/images/hero-light.png"
-  alt="Hero Light"
-/>
-<img
-  className="hidden dark:block"
-  src="/images/hero-dark.png"
-  alt="Hero Dark"
-/>
+Rulesets is a GitHub App built with Probot that automates pull request workflows, enforces code quality standards, and streamlines the review process. By defining rules in a YAML configuration file, you can automatically validate pull requests against your team's conventions and trigger appropriate actions based on validation results.
 
-## Setting up
-
-The first step to world-class documentation is setting up your editing environments.
+## Key Features
 
 <CardGroup cols={2}>
-  <Card
-    title="Edit Your Docs"
-    icon="pen-to-square"
-    href="https://mintlify.com/docs/quickstart"
-  >
-    Get your docs set up locally for easy development
+  <Card title="Flexible Configuration" icon="gear">
+    Define your rules in a simple YAML format that's easy to understand and
+    maintain
   </Card>
-  <Card
-    title="Preview Changes"
-    icon="image"
-    href="https://mintlify.com/docs/development"
-  >
-    Preview your changes before you push to make sure they're perfect
+  <Card title="Event-Driven" icon="bolt">
+    Trigger rules based on various GitHub webhook events like opening or
+    updating PRs
+  </Card>
+  <Card title="Conditional Logic" icon="code-branch">
+    Apply rules only when specific conditions are met
+  </Card>
+  <Card title="Powerful Validations" icon="check-double">
+    Validate PRs against a wide range of criteria including titles,
+    descriptions, and more
+  </Card>
+  <Card title="Automated Actions" icon="robot">
+    Take automated actions based on validation results
+  </Card>
+  <Card title="Template Support" icon="file-code">
+    Use variables in your messages and comments for dynamic content
   </Card>
 </CardGroup>
 
-## Make it yours
+## How It Works
 
-Update your docs to your brand and add valuable content for the best user conversion.
+1. Install the Rulesets GitHub App on your repository
+2. Create a `.github/Ruleset.yml` configuration file
+3. Define your ruleset with events, conditions, validations, and actions
+4. When a pull request is created or updated, Rulesets automatically applies your rules
 
-<CardGroup cols={2}>
-  <Card
-    title="Customize Style"
-    icon="palette"
-    href="https://mintlify.com/docs/settings/global"
-  >
-    Customize your docs to your company's colors and brands
-  </Card>
-  <Card
-    title="Reference APIs"
-    icon="code"
-    href="https://mintlify.com/docs/api-playground/openapi"
-  >
-    Automatically generate endpoints from an OpenAPI spec
-  </Card>
-  <Card
-    title="Add Components"
-    icon="screwdriver-wrench"
-    href="https://mintlify.com/docs/content/components/accordions"
-  >
-    Build interactive features and designs to guide your users
-  </Card>
-  <Card
-    title="Get Inspiration"
-    icon="stars"
-    href="https://mintlify.com/customers"
-  >
-    Check out our showcase of our favorite documentation
-  </Card>
-</CardGroup>
+## Example Configuration
+
+```yaml
+ruleset:
+  - name: "Conventional Commit Format"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(\\w+\\))?: .+"
+        message: "PR title must follow conventional commit format"
+    on_success:
+      - label:
+          add: ["conventional-format"]
+    on_failure:
+      - comment:
+          body: "Please follow the conventional commit format for your PR title"
+```
+
+This example rule validates that PR titles follow the conventional commit format, adds a label when they do, and comments when they don't.
+
+## Benefits
+
+- **Consistent PR Quality**: Enforce standards automatically
+- **Reduced Manual Work**: Automate repetitive review tasks
+- **Faster Reviews**: Focus on code, not checklists
+- **Better Onboarding**: Help new contributors understand your workflow
+- **Customizable Workflow**: Adapt to your team's specific needs

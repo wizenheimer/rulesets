@@ -1,0 +1,186 @@
+---
+title: 'Validations'
+description: 'Validate pull request content and metadata'
+---
+
+Validations check if a pull request meets specified criteria. The `validate` property of a rule contains an array of validations to run. All validations must pass for the rule to be considered successful.
+
+## Validation Structure
+
+Validations are defined in the `validate` array of a rule:
+
+```yaml
+validate:
+  - type: "validation_type"
+    # validation parameters
+  - type: "another_validation_type"
+    # validation parameters
+```
+
+Each validation has a `type` and type-specific parameters.
+
+## Available Validator Types
+
+<CardGroup cols={2}>
+  <Card title="Title" icon="heading" href="/validators/title">
+    Validate PR title format and length
+  </Card>
+  <Card title="Commit" icon="code-commit" href="/validators/commit">
+    Validate commit message format
+  </Card>
+  <Card title="Description" icon="file-lines" href="/validators/description">
+    Validate PR description content and length
+  </Card>
+  <Card title="Branch" icon="code-branch" href="/validators/branch">
+    Validate branch naming conventions
+  </Card>
+  <Card title="Size" icon="expand" href="/validators/size">
+    Validate PR size (files, additions, deletions)
+  </Card>
+  <Card title="Dependent" icon="link" href="/validators/dependent">
+    Validate related files are included
+  </Card>
+  <Card title="Task List" icon="list-check" href="/validators/task-list">
+    Validate task list completion in PR description
+  </Card>
+  <Card title="Approvals" icon="thumbs-up" href="/validators/approvals">
+    Validate PR approval requirements
+  </Card>
+  <Card title="Label" icon="tag" href="/validators/label">
+    Validate PR labels
+  </Card>
+  <Card title="Age" icon="calendar" href="/validators/age">
+    Validate PR age (time since creation/update)
+  </Card>
+</CardGroup>
+
+## Common Parameters
+
+While each validator has specific parameters, some common parameters include:
+
+<ParamField path="message" type="string">
+  Custom message to show when validation fails
+</ParamField>
+
+<ParamField path="match" type="string | string[]">
+  Pattern(s) that content should match (supports regex)
+</ParamField>
+
+<ParamField path="ignore" type="string | string[]">
+  Pattern(s) that content should not match (supports regex)
+</ParamField>
+
+## Example Use Cases
+
+### Title Validation
+
+Ensure PR titles follow a convention:
+
+```yaml
+validate:
+  - type: "title"
+    match: "^(feat|fix|docs): .+"
+    message: "PR title must start with feat:, fix:, or docs:"
+```
+
+### Size Limitations
+
+Keep PRs manageable in size:
+
+```yaml
+validate:
+  - type: "size"
+    files: 10
+    addition: 500
+    deletion: 200
+    message: "PRs should be small and focused"
+```
+
+### Required Approvals
+
+Ensure PRs get adequate review:
+
+```yaml
+validate:
+  - type: "approvals"
+    count:
+      min: 2
+    require_code_owners: true
+    message: "PRs need at least 2 approvals including code owners"
+```
+
+### Complete Description
+
+Require comprehensive PR descriptions:
+
+```yaml
+validate:
+  - type: "description"
+    no_empty: true
+    length:
+      min: 50
+    match: "(What|Why|How).*"
+    message: "PR description must explain what, why and how"
+```
+
+## Validation Results
+
+Each validation produces a result with:
+
+- **Status**: One of `pass`, `fail`, or `error`
+- **Validator**: The validator type
+- **Message**: A description of the result
+- **Details**: (Optional) Additional information
+
+These results determine whether to run `on_success` or `on_failure` actions.
+
+## Templates
+
+You can use the `{{ validation_summary }}` template variable in your action messages to include a summary of all validation results:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        Please fix the issues with your PR:
+        
+        {{ validation_summary }}
+```
+
+## Advanced Example
+
+```yaml
+ruleset:
+  - name: "Complete PR Validation"
+    when:
+      - "pull_request.opened"
+      - "pull_request.edited"
+      - "pull_request.synchronize"
+    validate:
+      - type: "title"
+        match: "^(feat|fix|docs)(\\(\\w+\\))?: .+"
+      - type: "description"
+        no_empty: true
+        length:
+          min: 50
+      - type: "size"
+        files: 15
+      - type: "label"
+        include: ["type:feature", "type:bug", "type:docs"]
+        message: "PR must have a type label"
+      - type: "taskList"
+        include: ["Checklist"]
+    on_success:
+      - label:
+          add: ["ready-for-review"]
+    on_failure:
+      - comment:
+          body: |
+            Thank you for your PR! There are some issues that need to be addressed:
+            
+            {{ validation_summary }}
+            
+            Please fix these issues and update your PR.
+```
+
+This comprehensive example validates multiple aspects of a PR including title format, description length, PR size, required labels, and task list completion.

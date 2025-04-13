@@ -1,0 +1,306 @@
+---
+title: "Label Validator"
+description: "Validate PR labels"
+---
+
+The Label Validator ensures that pull requests have the required labels and don't have forbidden labels. This helps categorize PRs correctly and enforce workflow stages.
+
+## Configuration
+
+<ParamField path="type" type="string" required>
+  Must be set to `"label"`
+</ParamField>
+
+<ParamField path="count" type="object">
+  Requirements for the number of labels
+</ParamField>
+
+<ParamField path="count.min" type="number">
+  Minimum number of labels required
+</ParamField>
+
+<ParamField path="count.max" type="number">
+  Maximum number of labels allowed
+</ParamField>
+
+<ParamField path="include" type="string | string[]">
+  Label pattern(s) that must be present (supports regex)
+</ParamField>
+
+<ParamField path="exclude" type="string | string[]">
+  Label pattern(s) that must not be present (supports regex)
+</ParamField>
+
+<ParamField path="message" type="string">
+  Custom message to display when validation fails
+</ParamField>
+
+## Basic Usage
+
+```yaml
+validate:
+  - type: "label"
+    include: ["bug", "enhancement", "documentation"]
+    message: "PR must have at least one type label (bug, enhancement, or documentation)"
+```
+
+## Examples
+
+### Required Labels
+
+Ensure PRs have at least one specific label:
+
+```yaml
+validate:
+  - type: "label"
+    include: ["bug", "enhancement", "documentation"]
+    message: "PR must have at least one type label (bug, enhancement, or documentation)"
+```
+
+### Forbidden Labels
+
+Prevent merging PRs with certain labels:
+
+```yaml
+validate:
+  - type: "label"
+    exclude: ["do-not-merge", "wip", "on-hold"]
+    message: "PR cannot be merged with 'do-not-merge', 'wip', or 'on-hold' labels"
+```
+
+### Label Count
+
+Enforce a minimum and maximum number of labels:
+
+```yaml
+validate:
+  - type: "label"
+    count:
+      min: 2
+      max: 5
+    message: "PR must have between 2 and 5 labels"
+```
+
+### Pattern Matching
+
+Use patterns to match label categories:
+
+```yaml
+validate:
+  - type: "label"
+    include: ["type:.+", "priority:.+"]
+    message: "PR must have both a type and priority label"
+```
+
+### Combined Requirements
+
+Combine multiple label requirements:
+
+```yaml
+validate:
+  - type: "label"
+    count:
+      min: 3
+    include: ["type:.+", "component:.+"]
+    exclude: ["do-not-merge", "wip"]
+    message: "PR must have at least 3 labels including type and component labels, and cannot have 'do-not-merge' or 'wip' labels"
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Get Labels">
+    The validator retrieves all labels currently applied to the PR
+  </Step>
+  <Step title="Check Count">
+    If `count` is specified, it verifies the number of labels meets requirements
+  </Step>
+  <Step title="Check Required Labels">
+    If `include` is specified, it checks that at least one matching label is present for each pattern
+  </Step>
+  <Step title="Check Forbidden Labels">
+    If `exclude` is specified, it checks that no matching labels are present
+  </Step>
+  <Step title="Return Result">
+    Returns a validation result with status (pass, fail, or error) and a message
+  </Step>
+</Steps>
+
+## Pattern Matching
+
+The Label Validator supports several pattern matching methods:
+
+1. **Exact match**: `"bug"`
+2. **Glob patterns**: `"type-*"`
+3. **Regular expressions**: `"/^type:.+$/"` (enclosed in forward slashes)
+
+## Practical Use Cases
+
+### PR Type Categorization
+
+Ensure PRs are properly categorized:
+
+```yaml
+ruleset:
+  - name: "PR Type Labels"
+    when:
+      - "pull_request.opened"
+      - "pull_request.labeled"
+      - "pull_request.unlabeled"
+    validate:
+      - type: "label"
+        include:
+          [
+            "type:bug",
+            "type:feature",
+            "type:refactor",
+            "type:docs",
+            "type:test",
+          ]
+        message: "PR must have a type label"
+    on_failure:
+      - comment:
+          body: |
+            Please add one of the following type labels to your PR:
+            - `type:bug` - Bug fixes
+            - `type:feature` - New features
+            - `type:refactor` - Code refactoring
+            - `type:docs` - Documentation changes
+            - `type:test` - Test additions/changes
+```
+
+### Release Readiness
+
+Validate that PRs are ready for release:
+
+```yaml
+ruleset:
+  - name: "Release Readiness"
+    when:
+      - "pull_request.labeled"
+      - "pull_request.unlabeled"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "label"
+        include: ["reviewed", "tested"]
+        exclude: ["wip", "do-not-merge", "needs-rebase"]
+    on_success:
+      - label:
+          add: ["ready-to-merge"]
+    on_failure:
+      - label:
+          remove: ["ready-to-merge"]
+```
+
+### Changelog Categories
+
+Enforce changelog categorization:
+
+```yaml
+ruleset:
+  - name: "Changelog Categories"
+    when:
+      - "pull_request.opened"
+      - "pull_request.labeled"
+      - "pull_request.unlabeled"
+    validate:
+      - type: "label"
+        include:
+          [
+            "changelog:added",
+            "changelog:changed",
+            "changelog:deprecated",
+            "changelog:removed",
+            "changelog:fixed",
+            "changelog:security",
+            "changelog:none",
+          ]
+        message: "PR must have a changelog label"
+    on_failure:
+      - comment:
+          body: |
+            Please add a changelog label to indicate how this change should be categorized in the changelog:
+            - `changelog:added` - New features
+            - `changelog:changed` - Changes in existing functionality
+            - `changelog:deprecated` - Soon-to-be removed features
+            - `changelog:removed` - Removed features
+            - `changelog:fixed` - Bug fixes
+            - `changelog:security` - Security fixes
+            - `changelog:none` - Changes that don't affect the changelog
+```
+
+### Component Labeling
+
+Ensure changes are associated with specific components:
+
+```yaml
+ruleset:
+  - name: "Component Labeling"
+    when:
+      - "pull_request.opened"
+      - "pull_request.labeled"
+      - "pull_request.unlabeled"
+    validate:
+      - type: "label"
+        include: ["component:.+"]
+        message: "PR must have a component label"
+    on_failure:
+      - comment:
+          body: |
+            Please add a component label to your PR (e.g., `component:frontend`, `component:api`, `component:database`).
+
+            This helps with release notes and tracking changes across components.
+```
+
+## Best Practices
+
+<Check>Use a consistent label naming scheme</Check>
+<Check>Document your label requirements in contributing guidelines</Check>
+<Check>Create labels in your repository before using them in rules</Check>
+<Check>Use label colors to make categories visually distinguishable</Check>
+
+<Warning>
+  Don't require too many labels, as it creates friction for contributors
+</Warning>
+
+## Using with PR Creation Templates
+
+To help contributors apply the right labels from the start, you can use GitHub's PR template forms:
+
+```yaml
+# .github/PULL_REQUEST_TEMPLATE/form.yml
+name: Pull Request
+description: Create a new pull request
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: What kind of change does this PR introduce?
+      options:
+        - Bug fix
+        - New feature
+        - Documentation
+        - Refactoring
+        - Performance improvement
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Frontend
+        - Backend
+        - API
+        - Database
+        - Documentation
+    validations:
+      required: true
+```
+
+Then use GitHub Actions to apply labels based on the form inputs.

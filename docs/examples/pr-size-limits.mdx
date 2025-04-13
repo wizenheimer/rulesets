@@ -1,0 +1,253 @@
+---
+title: "PR Size Limits Example"
+description: "Enforce manageable PR sizes with automatic labeling and feedback"
+---
+
+This example shows how to enforce size limits on pull requests and provide helpful feedback to contributors, encouraging smaller, more focused changes.
+
+## Configuration
+
+```yaml
+ruleset:
+  # Rule 2: PR Size Limits
+  - name: "PR Size Check"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    validate:
+      - type: "size"
+        files: 10
+        total: 500
+        addition: 400
+        deletion: 200
+        message: "This PR is too large. Please split it into smaller PRs."
+    on_failure:
+      - label:
+          add: ["large-pr"]
+      - comment:
+          body: |
+            ## Large Pull Request Detected
+
+            This PR exceeds our size guidelines:
+
+            {{ validation_summary }}
+
+            Large PRs are harder to review and more likely to introduce bugs. Please consider:
+
+            - Breaking this change into multiple smaller PRs
+            - Focusing each PR on a single concern
+            - Removing unnecessary changes or generated files
+
+            If this large PR is absolutely necessary, please provide a detailed explanation.
+```
+
+## How It Works
+
+This ruleset:
+
+1. Triggers when a PR is opened or synchronized (new commits pushed)
+2. Validates that the PR doesn't exceed size limits:
+   - Maximum 10 files changed
+   - Maximum 500 total lines changed
+   - Maximum 400 lines added
+   - Maximum 200 lines deleted
+3. When the PR is too large:
+   - Adds a "large-pr" label
+   - Comments with guidance on how to address the issue
+
+## Extending the Example
+
+### Ignore Certain Files
+
+Exclude files that often change in bulk but don't require careful review:
+
+```yaml
+validate:
+  - type: "size"
+    files: 10
+    total: 500
+    ignore:
+      - "package-lock.json"
+      - "yarn.lock"
+      - "*.generated.ts"
+      - "*.min.js"
+    message: "This PR is too large (excluding dependency lock files and generated code)."
+```
+
+### Size-Based Labeling
+
+Automatically label PRs based on their size:
+
+```yaml
+ruleset:
+  - name: "Remove Size Labels"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    on_success:
+      - label:
+          remove:
+            ["size: small", "size: medium", "size: large", "size: x-large"]
+
+  - name: "Small PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          max: 3
+        total:
+          max: 100
+    on_success:
+      - label:
+          add: ["size: small"]
+
+  - name: "Medium PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 4
+          max: 10
+        total:
+          min: 101
+          max: 300
+    on_success:
+      - label:
+          add: ["size: medium"]
+
+  - name: "Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 11
+          max: 20
+        total:
+          min: 301
+          max: 500
+    on_success:
+      - label:
+          add: ["size: large"]
+
+  - name: "X-Large PR"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "size"
+        files:
+          min: 21
+        total:
+          min: 501
+    on_success:
+      - label:
+          add: ["size: x-large"]
+      - comment:
+          body: |
+            ## Extra Large Pull Request
+
+            This PR is very large and may take longer to review.
+            Consider breaking it into smaller, more focused PRs if possible.
+```
+
+### Different Limits by Branch
+
+Set stricter limits for important branches:
+
+```yaml
+ruleset:
+  - name: "Main Branch Size Limits"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "main"
+    validate:
+      - type: "size"
+        files: 5
+        total: 200
+    on_failure:
+      - label:
+          add: ["large-pr", "needs-split"]
+      - comment:
+          body: |
+            ## PR Too Large for Main Branch
+
+            PRs targeting the main branch must be small and focused.
+            Please split this PR into smaller changes.
+
+            {{ validation_summary }}
+
+  - name: "Development Branch Size Limits"
+    when:
+      - "pull_request.opened"
+      - "pull_request.synchronize"
+    if:
+      - type: "branch"
+        base:
+          match: "develop"
+    validate:
+      - type: "size"
+        files: 15
+        total: 800
+    on_failure:
+      - label:
+          add: ["large-pr"]
+      - comment:
+          body: |
+            ## Large PR
+
+            This PR exceeds our recommended size limits.
+
+            {{ validation_summary }}
+```
+
+## Strategies for Managing Large PRs
+
+Include helpful advice in your feedback:
+
+```yaml
+on_failure:
+  - comment:
+      body: |
+        ## Large Pull Request Detected
+
+        This PR exceeds our size guidelines. Here are some strategies to make it more manageable:
+
+        1. **Split by feature**: Create separate PRs for each logical feature or change
+        2. **Split by layer**: Separate backend/frontend/UI changes into different PRs
+        3. **Split by directory**: Create PRs based on directories or components
+        4. **Split by steps**: Submit refactoring before adding new features
+
+        Remember that smaller PRs:
+        - Get reviewed faster
+        - Are more likely to be approved
+        - Have fewer bugs
+        - Provide quicker feedback
+
+        If splitting isn't possible, please explain why in the PR description.
+```
+
+## Implementation Tips
+
+1. **Start with generous limits**: Begin with larger limits and gradually reduce them
+2. **Educate your team**: Explain the benefits of smaller PRs
+3. **Lead by example**: Have maintainers model good PR practices
+4. **Make exceptions when needed**: Some valid changes (like major refactoring) might need to be larger
+5. **Set up your workflow**: Use branch protection rules alongside Rulesets
+
+## Benefits
+
+- **Higher quality code**: Smaller PRs get more thorough reviews
+- **Faster cycle time**: PRs move through the review process more quickly
+- **Better collaboration**: Reviewers are more willing to review smaller changes
+- **Lower cognitive load**: Reviewers can focus on one concern at a time
+- **Smoother integration**: Smaller changes integrate more easily with the codebase
