@@ -1,8 +1,4 @@
 <div align="center">
-  <a href="https://github.com/wizenheimer/rulesets">
-    <img src="https://avatars.githubusercontent.com/u/9919?s=200&v=4" height="80" alt="GitHub Logo" />
-  </a>
-
   <h3 align="center">Rulesets</h3>
 
   <p align="center">
@@ -17,11 +13,11 @@
   </p>
 </div>
 
+<img src="media/banner.png" alt="Rulesets Banner" />
+
 **Rulesets** is a GitHub App to help teams enforce pull request standards and automate PR workflows. Define rules using a simple YAML file to automatically validate and take action on PRs based on your team's conventions.
 
 ## Features
-
-<img src="media/banner.png" alt="Rulesets Banner" />
 
 - **Flexible Configuration** – Define rules using intuitive YAML syntax
 - **Event-Driven** – Trigger on `pull_request` events like open, edit, and sync
