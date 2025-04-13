@@ -1,7 +1,11 @@
 import { Probot } from "probot";
+import { Processor } from "./processor.js";
+import { logger } from "./util/logger.js";
 
 export default (app: Probot) => {
-  // Pull Request Events
+  app.log.info("PR Validator loaded!");
+
+  // Pull request events
   app.on(
     [
       "pull_request.opened",
@@ -18,12 +22,9 @@ export default (app: Probot) => {
       "pull_request.demilestoned",
     ],
     async (context) => {
-      console.log(
-        "pull request event",
-        context.payload,
-        "event type",
-        context.name
-      );
+      logger.info(`Processing pull_request event: ${context.payload.action}`);
+      const processor = new Processor(context);
+      await processor.process();
     }
   );
 
@@ -35,12 +36,11 @@ export default (app: Probot) => {
       "pull_request_review.dismissed",
     ],
     async (context) => {
-      console.log(
-        "pull request review event",
-        context.payload,
-        "event type",
-        context.name
+      logger.info(
+        `Processing pull_request_review event: ${context.payload.action}`
       );
+      const processor = new Processor(context);
+      await processor.process();
     }
   );
 
@@ -51,12 +51,11 @@ export default (app: Probot) => {
       "pull_request_review_comment.edited",
     ],
     async (context) => {
-      console.log(
-        "pull request review comment event",
-        context.payload,
-        "event type",
-        context.name
+      logger.info(
+        `Processing pull_request_review_comment event: ${context.payload.action}`
       );
+      const processor = new Processor(context);
+      await processor.process();
     }
   );
 
