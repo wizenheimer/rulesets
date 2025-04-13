@@ -16,6 +16,31 @@ import * as validators from "./validators/index.js";
 import * as actions from "./actions/index.js";
 import { logger } from "./util/logger.js";
 
+// Map configuration validator names to exported validator functions
+const validatorNameMap: Record<string, string> = {
+  title: "titleValidator",
+  commit: "commitValidator",
+  size: "sizeValidator",
+  description: "descriptionValidator",
+  branch: "branchValidator",
+  taskList: "taskListValidator",
+  dependent: "dependentValidator",
+  age: "ageValidator",
+  approvals: "approvalsValidator",
+  label: "labelValidator",
+};
+
+// Map configuration action names to exported action functions
+const actionNameMap: Record<string, string> = {
+  comment: "commentAction",
+  label: "labelAction",
+  merge: "mergeAction",
+  close: "closeAction",
+  checks: "checksAction",
+  assign: "assignAction",
+  requestReview: "requestReviewAction",
+};
+
 export class Processor {
   constructor(private context: Context) {}
 
@@ -124,9 +149,11 @@ export class Processor {
       const validatorConfig = validation;
 
       try {
-        if (validatorType in validators) {
+        const validatorFunctionName =
+          validatorNameMap[validatorType] || validatorType;
+        if (validatorFunctionName in validators) {
           const validatorFunction = (validators as any)[
-            validatorType
+            validatorFunctionName
           ] as ValidatorFunction;
           const result = await validatorFunction(this.context, validatorConfig);
           results.push(result);
@@ -160,8 +187,9 @@ export class Processor {
       const actionSettings = actionConfig[actionType];
 
       try {
-        if (actionType in actions) {
-          const actionFunction = (actions as any)[actionType];
+        const actionFunctionName = actionNameMap[actionType] || actionType;
+        if (actionFunctionName in actions) {
+          const actionFunction = (actions as any)[actionFunctionName];
           await actionFunction(this.context, actionSettings, validationResults);
         } else {
           logger.warn(`Unknown action type: ${actionType}`);
